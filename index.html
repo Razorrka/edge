@@ -190,6 +190,9 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
   .clock{min-width:auto;margin-left:auto} .clock .t{font-size:26px}
   .stat{font-size:10px}
   .sec{padding:14px}
+  /* stacked, or a letterspaced caps heading collides with its own meta text */
+  .hd{flex-direction:column;align-items:flex-start;gap:5px;margin-bottom:12px}
+  .hd .r{text-align:left}
   .verdict{padding:16px 14px}
   .vword{font-size:54px}
   .pline{margin:14px 0 4px} .pbig{font-size:32px}
