@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="EDGE" />
+<meta name="theme-color" content="#08080a" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<title>EDGE · BTC 15m</title>
+<style>
+:root{
+  --bg:#08080a; --surf:#0d0d10; --surf2:#131317; --line:#1d1d23; --line2:#2a2a32;
+  --txt:#ecedf0; --dim:#8b8c96; --dim2:#5c5d67;
+  --yes:#12d18e; --no:#ff4d5e; --skip:#7d7e8a; --warn:#ffb020; --info:#5aa9ff;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Inter","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;font-size:14px}
+.app{max-width:1460px;margin:0 auto}
+
+/* ---------- top rail ---------- */
+.rail{display:flex;align-items:center;gap:28px;padding:16px 26px 14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;flex-direction:column;gap:3px;min-width:132px}
+.brand .n{font-size:19px;font-weight:800;letter-spacing:.20em}
+.brand .s{font-size:9.5px;letter-spacing:.16em;color:var(--dim2);text-transform:uppercase}
+.px{display:flex;align-items:baseline;gap:12px;flex:1}
+.px .v{font-family:var(--mono);font-size:31px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.px .d{font-family:var(--mono);font-size:13px;color:var(--dim)}
+.px .d.up{color:var(--yes)} .px .d.dn{color:var(--no)}
+.clock{text-align:right;min-width:150px}
+.clock .t{font-family:var(--mono);font-size:31px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.clock .l{font-size:9.5px;letter-spacing:.16em;color:var(--dim2);text-transform:uppercase;margin-top:2px}
+.stat{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);font-family:var(--mono)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--dim2)}
+.dot.ok{background:var(--yes);box-shadow:0 0 0 3px rgba(18,209,142,.14)}
+.dot.err{background:var(--warn);box-shadow:0 0 0 3px rgba(255,176,32,.14)}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+.dot.busy{background:var(--info);animation:pulse 1s infinite}
+
+/* window progress hairline */
+.prog{height:2px;background:var(--line)}
+.prog>i{display:block;height:100%;width:0%;background:var(--txt);transition:width .35s linear}
+.prog>i.hot{background:var(--warn)}
+
+/* ---------- layout ---------- */
+.main{display:grid;grid-template-columns:1fr 404px;gap:1px;background:var(--line)}
+.col{background:var(--bg);display:flex;flex-direction:column;min-width:0}
+.sec{border-bottom:1px solid var(--line);padding:18px 26px}
+.sec:last-child{border-bottom:0}
+.hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.hd h2{font-size:10px;letter-spacing:.17em;color:var(--dim2);text-transform:uppercase;font-weight:700}
+.hd .r{font-size:10.5px;letter-spacing:.06em;color:var(--dim);font-family:var(--mono)}
+
+/* ---------- verdict ---------- */
+.verdict{padding:26px}
+.vtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.vtag{font-size:10px;letter-spacing:.17em;color:var(--dim2);text-transform:uppercase;font-weight:700}
+.vage{font-family:var(--mono);font-size:10.5px;color:var(--dim2)}
+.vword{font-size:clamp(58px,7.6vw,92px);font-weight:800;letter-spacing:-.045em;line-height:.98;margin:8px 0 2px}
+.vword.yes{color:var(--yes)} .vword.no{color:var(--no)} .vword.skip{color:var(--skip)}
+.vsub{font-size:13px;color:var(--dim);line-height:1.5;min-height:20px}
+.pline{display:flex;align-items:flex-end;gap:16px;margin:20px 0 6px}
+.pbig{font-family:var(--mono);font-size:40px;font-weight:600;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.pmeta{font-size:10px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase;padding-bottom:5px}
+.conv{margin-top:12px}
+.convbar{height:3px;background:var(--line);position:relative;overflow:hidden}
+.convbar>i{display:block;height:100%;width:0%;background:var(--txt);transition:width .4s}
+.convlbl{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.13em;color:var(--dim2);text-transform:uppercase;margin-top:7px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);margin-top:20px}
+.kpi{background:var(--surf);padding:12px 13px}
+.kpi .k{font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase}
+.kpi .v{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:5px;font-variant-numeric:tabular-nums}
+.kpi .n{font-size:10px;color:var(--dim2);margin-top:2px}
+/* live-vs-locked strip */
+.livestrip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--line);margin-top:18px;border-top:1px solid var(--line)}
+.livestrip>div{background:var(--surf);padding:9px 12px;display:flex;flex-direction:column;gap:4px}
+.livestrip .lsk{font-size:8.5px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase}
+.livestrip .lsv{font-family:var(--mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+.livestrip .lsD{grid-column:1/-1;flex-direction:row;align-items:center;gap:8px;font-size:10.5px;letter-spacing:.04em;color:var(--dim2);padding:8px 12px}
+.livestrip .lsD.warn{color:var(--warn)} .livestrip .lsD.armed{color:var(--info)}
+@keyframes flash{0%{background:rgba(255,176,32,.22)}100%{background:var(--surf)}}
+.livestrip.alert>div{animation:flash 1.1s ease-out}
+
+.callout{margin-top:16px;border-left:2px solid var(--warn);background:rgba(255,176,32,.05);padding:10px 13px;font-size:12px;line-height:1.5;color:#f0d9a8;display:none}
+.callout.on{display:block}
+.callout b{color:var(--warn)}
+
+/* ---------- chart ---------- */
+.chartwrap{position:relative;height:322px}
+canvas{width:100%;height:100%;display:block}
+.wstats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);margin-top:16px}
+.ws{background:var(--surf);padding:10px 12px}
+.ws .k{font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase}
+.ws .v{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:5px;font-variant-numeric:tabular-nums}
+
+/* ---------- wire ---------- */
+.wire .w{display:grid;grid-template-columns:8px 1fr 46px;align-items:center;gap:11px;padding:6px 0;border-bottom:1px solid var(--line)}
+.wire .w:last-child{border-bottom:0}
+.wire .w i{width:5px;height:5px;border-radius:50%;background:var(--dim2);display:block}
+.wire .w i.p{background:var(--yes)} .wire .w i.n{background:var(--no)}
+.wire .w .h{font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wire .w .a{font-family:var(--mono);font-size:10px;color:var(--dim2);text-align:right}
+
+/* ---------- evidence ---------- */
+.ev{display:grid;grid-template-columns:1fr;gap:0}
+.evr{display:grid;grid-template-columns:132px 1fr 78px 116px;align-items:center;gap:14px;padding:7px 0;border-bottom:1px solid var(--line)}
+.evr:last-child{border-bottom:0}
+.evr .en{font-size:11.5px;color:var(--txt);letter-spacing:.01em}
+.evr .eb{height:16px;position:relative;background:var(--surf)}
+.evr .eb:before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2)}
+.evr .eb>i{position:absolute;top:3px;bottom:3px;background:var(--dim2)}
+.evr .eb>i.pos{background:var(--yes)} .evr .eb>i.neg{background:var(--no)}
+.evr .ev2{font-family:var(--mono);font-size:11.5px;text-align:right;color:var(--txt);font-variant-numeric:tabular-nums}
+.evr .en2{font-size:10.5px;color:var(--dim2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* block header vs member signal */
+.evr.evb{border-bottom:1px solid var(--line2);margin-top:10px}
+.evr.evb:first-child{margin-top:0}
+.evr.evb .en{font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;font-weight:700;color:var(--txt)}
+.evr.evb .ev2{font-weight:700}
+.evr.evb .eb{height:18px;background:var(--surf2)}
+.evr.evf{border-bottom:0}
+.evr.evf .en{padding-left:12px;color:var(--dim);font-size:11px}
+.evr.evf .eb{height:11px}
+.evr.evf.off{opacity:.34}
+
+/* ---------- stream ---------- */
+.stream{font-family:var(--mono);font-size:10.8px;line-height:1.72;height:250px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.sl{display:flex;gap:9px;white-space:nowrap}
+.sl .st{color:var(--dim2);flex:none}
+.sl .sx{overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+.sl.hi .sx{color:var(--txt)}
+.sl.g .sx{color:var(--yes)} .sl.r .sx{color:var(--no)}
+.sl.y .sx{color:var(--warn)} .sl.b .sx{color:var(--info)}
+
+/* ---------- controls ---------- */
+.ctl{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.f{background:var(--surf);padding:10px 13px}
+.f.wide{grid-column:1/-1}
+.f label{display:block;font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase;margin-bottom:6px}
+.f input[type=text]{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line2);color:var(--txt);font-family:var(--mono);font-size:15px;padding:2px 0 5px;outline:none}
+.f input[type=text]:focus{border-bottom-color:var(--txt)}
+.f input::placeholder{color:var(--dim2)}
+.two{display:flex;gap:12px}
+.two>div{flex:1}
+input[type=range]{width:100%;-webkit-appearance:none;background:transparent;height:16px;outline:none}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--txt);margin-top:-5px;cursor:pointer}
+.riskrow{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2px}
+.riskval{font-family:var(--mono);font-size:12px;font-weight:600}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+button{background:var(--surf);border:0;color:var(--txt);font-family:var(--sans);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;padding:12px;cursor:pointer;transition:background .12s}
+button:hover{background:var(--surf2)}
+button.on{background:var(--txt);color:var(--bg)}
+button.ghost{color:var(--dim2)}
+
+/* ---------- record ---------- */
+.rec{display:grid;grid-template-columns:repeat(6,1fr) 2fr;gap:1px;background:var(--line);border-top:1px solid var(--line)}
+.rc{background:var(--surf);padding:13px 16px}
+.rc .k{font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase}
+.rc .v{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:5px;font-variant-numeric:tabular-nums}
+.rc .n{font-size:10px;color:var(--dim2);margin-top:2px}
+.dots{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.dots i{width:9px;height:9px;border-radius:2px;background:var(--line2);display:block}
+.dots i.w{background:var(--yes)} .dots i.l{background:var(--no)} .dots i.s{background:var(--dim2);opacity:.5}
+
+.note{padding:14px 26px 26px;font-size:10.5px;line-height:1.65;color:var(--dim2);border-top:1px solid var(--line)}
+.note b{color:var(--dim)}
+
+@media(max-width:1080px){
+  .main{grid-template-columns:1fr}
+  .rec{grid-template-columns:repeat(3,1fr)}
+  .rec .rc:last-child{grid-column:1/-1}
+  .rail{flex-wrap:wrap;gap:16px}
+}
+
+/* ================= installed / phone ================= */
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+@media(max-width:640px){
+  body{font-size:13px}
+  .rail{padding:10px 14px;gap:10px 16px}
+  .brand{min-width:auto} .brand .n{font-size:16px} .brand .s{font-size:8px}
+  .px{flex:1 0 100%;order:3} .px .v{font-size:26px} .px .d{font-size:10px}
+  .clock{min-width:auto;margin-left:auto} .clock .t{font-size:26px}
+  .stat{font-size:10px}
+  .sec{padding:14px}
+  .verdict{padding:16px 14px}
+  .vword{font-size:54px}
+  .pline{margin:14px 0 4px} .pbig{font-size:32px}
+  .chartwrap{height:236px}
+  .wstats{grid-template-columns:repeat(2,1fr)}
+  .rec{grid-template-columns:repeat(2,1fr)}
+  .rec .rc:last-child{grid-column:1/-1}
+  /* drop the note column — name, bar and value stay legible */
+  .evr{grid-template-columns:100px 1fr 56px;gap:9px}
+  .evr .en2{display:none}
+  .evr.evf .en{padding-left:8px;font-size:10.5px}
+  .evr.evb .en{font-size:9px}
+  .kpi{padding:10px 9px} .kpi .v{font-size:15px} .kpi .n{font-size:9px}
+  .livestrip .lsv{font-size:13px} .livestrip>div{padding:8px 9px}
+  .livestrip .lsD{font-size:9.6px}
+  .stream{height:196px;font-size:9.6px;line-height:1.66}
+  .wire .w .h{font-size:10.8px}
+  .note{padding:12px 14px 24px}
+}
+/* touch targets */
+@media(pointer:coarse){
+  button{padding:15px 12px;font-size:11px}
+  /* 16px is the threshold below which iOS auto-zooms on focus */
+  .f input[type=text]{font-size:16px;padding:4px 0 8px}
+  input[type=range]{height:28px}
+  input[type=range]::-webkit-slider-thumb{width:20px;height:20px;margin-top:-9px}
+  .evr{padding:9px 0}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="rail">
+    <div class="brand"><div class="n">EDGE</div><div class="s">BTC 15-min · Kalshi</div></div>
+    <div class="px"><div class="v" id="px">$—</div><div class="d" id="pxd">—</div></div>
+    <div class="stat"><span class="dot" id="feedDot"></span><span id="feedTxt">connecting</span></div>
+    <div class="stat"><span class="dot busy" id="mcDot"></span><span id="mcTxt">model idle</span></div>
+    <div class="clock"><div class="t" id="cd">--:--</div><div class="l" id="cdl">window closes —</div></div>
+  </div>
+  <div class="prog"><i id="progBar"></i></div>
+
+  <div class="main">
+
+    <!-- ================= LEFT ================= -->
+    <div class="col">
+
+      <div class="sec">
+        <div class="hd">
+          <h2>Price · settlement cone</h2>
+          <div class="r" id="chartMeta">—</div>
+        </div>
+        <div class="chartwrap"><canvas id="chart"></canvas></div>
+        <div class="wstats">
+          <div class="ws"><div class="k">Window open</div><div class="v" id="wOpen">—</div></div>
+          <div class="ws"><div class="k">High · low</div><div class="v" id="wHL">—</div></div>
+          <div class="ws"><div class="k">σ per minute</div><div class="v" id="wSig">—</div></div>
+          <div class="ws"><div class="k">Strike touch</div><div class="v" id="wTouch">—</div></div>
+          <div class="ws"><div class="k">Drift / min</div><div class="v" id="wDrift">—</div></div>
+          <div class="ws"><div class="k">Vol regime</div><div class="v" id="wVol">—</div></div>
+          <div class="ws"><div class="k">Persistence</div><div class="v" id="wPers">—</div></div>
+          <div class="ws"><div class="k">Spread</div><div class="v" id="wSpread">—</div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="hd"><h2>Evidence</h2><div class="r" id="evMeta">—</div></div>
+        <div class="ev" id="evList"></div>
+      </div>
+
+      <div class="sec">
+        <div class="hd"><h2>Wire</h2><div class="r" id="wireMeta">—</div></div>
+        <div class="wire" id="wireList"></div>
+      </div>
+
+      <div class="sec">
+        <div class="hd"><h2>Model stream</h2><div class="r" id="streamMeta">—</div></div>
+        <div class="stream" id="stream"></div>
+      </div>
+
+    </div>
+
+    <!-- ================= RIGHT ================= -->
+    <div class="col">
+
+      <div class="verdict" style="border-bottom:1px solid var(--line)">
+        <div class="vtop"><span class="vtag" id="vtag">Live read</span><span class="vage" id="vage"></span></div>
+        <div class="vword skip" id="vword">WARMING</div>
+        <div class="vsub" id="vsub">pulling candles and building the return pool…</div>
+
+        <div class="pline">
+          <div class="pbig" id="pprob">—</div>
+          <div class="pmeta" id="pprobl">probability</div>
+        </div>
+        <div class="conv">
+          <div class="convbar"><i id="convFill"></i></div>
+          <div class="convlbl"><span>Conviction</span><span id="convTxt">—</span></div>
+        </div>
+
+        <div class="livestrip" id="liveStrip">
+          <div class="lsA"><span class="lsk">Live model</span><span class="lsv" id="liveCall">—</span></div>
+          <div class="lsB"><span class="lsk" id="liveKey">Close ≥ strike</span><span class="lsv" id="liveP">—</span></div>
+          <div class="lsC"><span class="lsk">Since lock</span><span class="lsv" id="liveD">—</span></div>
+          <div class="lsD" id="liveFlip">—</div>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi"><div class="k">Size</div><div class="v" id="kSize">—</div><div class="n" id="kSizeN">—</div></div>
+          <div class="kpi"><div class="k">Edge</div><div class="v" id="kEdge">—</div><div class="n" id="kEdgeN">enter ¢</div></div>
+          <div class="kpi"><div class="k">Kelly</div><div class="v" id="kKelly">—</div><div class="n" id="kKellyN">½-kelly</div></div>
+        </div>
+
+        <div class="callout" id="callout"></div>
+      </div>
+
+      <div class="sec">
+        <div class="hd"><h2>Contract</h2><div class="r" id="strikeMeta">auto</div></div>
+        <div class="ctl">
+          <div class="f wide">
+            <label>Kalshi strike $</label>
+            <input id="inStrike" type="text" inputmode="decimal" placeholder="paste strike — e.g. 118,250" />
+          </div>
+          <div class="f"><label>Yes ¢</label><input id="inYes" type="text" inputmode="decimal" placeholder="—" /></div>
+          <div class="f"><label>No ¢</label><input id="inNo" type="text" inputmode="decimal" placeholder="—" /></div>
+          <div class="f wide">
+            <div class="riskrow"><label style="margin:0">Risk appetite</label><span class="riskval" id="riskVal">AGGRESSIVE</span></div>
+            <input id="inRisk" type="range" min="0" max="100" value="75" />
+            <div style="display:flex;justify-content:space-between;font-size:9px;letter-spacing:.12em;color:var(--dim2);text-transform:uppercase"><span>selective</span><span>never skip</span></div>
+          </div>
+        </div>
+        <div class="btns" style="margin-top:1px">
+          <button id="btnLock">Re-read now</button>
+          <button id="btnSide">Take other side</button>
+          <button id="btnFlip" class="on">Auto-flip: on</button>
+          <button id="btnClear" class="ghost">Drop lock</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="hd"><h2>Position</h2><div class="r" id="lockMeta">none</div></div>
+        <div class="ev" id="lockBox"></div>
+      </div>
+
+      <div class="sec">
+        <div class="hd"><h2>Next window</h2><div class="r" id="nextMeta">—</div></div>
+        <div class="kpis">
+          <div class="kpi"><div class="k">Opens</div><div class="v" id="nwTime">—</div><div class="n" id="nwOpen">—</div></div>
+          <div class="kpi"><div class="k">Lean</div><div class="v" id="nwDir">—</div><div class="n">on momentum alone</div></div>
+          <div class="kpi"><div class="k">Likely close</div><div class="v" id="nwP">—</div><div class="n" id="nwRange">P25–P75</div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="hd"><h2>Settled calls</h2><div class="r" id="histMeta">—</div></div>
+        <div class="ev" id="histList"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="rec">
+    <div class="rc"><div class="k">Record</div><div class="v" id="rWL">0–0</div><div class="n" id="rWLn">no graded calls</div></div>
+    <div class="rc"><div class="k">Win rate</div><div class="v" id="rWR">—</div><div class="n">of decided calls</div></div>
+    <div class="rc"><div class="k">Streak</div><div class="v" id="rSt">0</div><div class="n" id="rStn">best —</div></div>
+    <div class="rc"><div class="k">Skip rate</div><div class="v" id="rSk">—</div><div class="n">windows sat out</div></div>
+    <div class="rc"><div class="k">Brier</div><div class="v" id="rBr">—</div><div class="n">lower = sharper</div></div>
+    <div class="rc"><div class="k">Trained on</div><div class="v" id="rTr">0</div><div class="n" id="rTrn">windows</div></div>
+    <div class="rc"><div class="k">Last 24 windows</div><div class="dots" id="rDots"></div>
+      <div style="margin-top:10px"><button class="ghost" id="btnReset" style="padding:6px 0;background:transparent;letter-spacing:.12em">Reset record + model</button></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>What this is.</b> A settlement model, not a crystal ball. Every tick it bootstraps thousands of price paths from BTC's own recent 1-minute returns and counts how many close above your strike — then a logistic layer that has been trained on this app's own settled windows adjusts that number, and a calibration term scales it back if the model has been running hot. Confidence is a probability, so it is allowed to be high when price is far from the strike near the close, and it is allowed to be near 50 when the window genuinely is a coin flip. <b>SKIP only fires inside the coin-flip band</b> set by the risk dial — turn the dial up and the band closes to zero. Price is Coinbase BTC-USD spot and can differ from Kalshi's settlement index. Nothing here is financial advice.
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   EDGE — BTC 15-minute settlement engine
+   Layers:  features → block-bootstrap Monte Carlo → learned
+            logistic blend → calibration → sized decision
+   ============================================================ */
+
+const WIN_MS   = 15*60*1000;
+/* 8,000 paths, not 3,000. At 3k the standard error on the headline probability
+   is ~0.9 points, so the number visibly flickers between ticks on a read that
+   has not actually changed. 8k cuts that to ~0.55 and costs a few ms. */
+const MC_PATHS = 8000;
+const BLOCK    = 3;                 // bootstrap block length (minutes)
+/* Twenty signals, but the learned layer does NOT fit twenty weights — it fits
+   five. Signals are grouped into blocks, each block averages its active
+   members, and the logistic layer weighs the five blocks. Fitting 20 weights
+   would need hundreds of settled windows before it meant anything; five needs
+   a couple of dozen. The evidence table still shows all twenty individually. */
+const BLOCKS = [
+  {k:"bTrend", label:"Trend",      feats:["trend","macd","legs","mtf","vwap"]},
+  {k:"bMomo",  label:"Momentum",   feats:["roc","rsi","bb","range"]},
+  {k:"bFlow",  label:"Order flow", feats:["tape","accel","book","whale","accept","pressure"]},
+  {k:"bStruct",label:"Structure",  feats:["regime","volume","wick"]},
+  {k:"bCtx",   label:"Context",    feats:["news","mood"]}
+];
+const BKEYS = BLOCKS.map(b=>b.k);
+const FEATS = BLOCKS.reduce((a,b)=>a.concat(b.feats),[]);
+/* Training samples store block values, not raw features. Bump this whenever
+   that shape changes so stale samples are dropped instead of silently
+   contributing zeros to every block they predate. */
+const SCHEMA = 2;
+
+const $ = id => document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const sigmoid=z=>1/(1+Math.exp(-z));
+const logit=p=>Math.log(clamp(p,1e-6,1-1e-6)/(1-clamp(p,1e-6,1-1e-6)));
+const money=v=>"$"+Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const short=v=>"$"+Math.round(Math.abs(v)).toLocaleString();
+const pct=(v,d)=>(v*100).toFixed(d===undefined?1:d)+"%";
+const hhmm=d=>d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+const mss=ms=>{const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");};
+
+/* ---------------- state ---------------- */
+let candles=[];                 // {t,o,h,l,c,v} 1-min ascending
+let tape=[];                    // {t,side,sz}
+let wsPrice=null,lastWsTick=0,price=null;
+let obImb=null, obPress=null, obSpread=null, fng=null, news=null, mood=null;
+let windowStart=null, windowOpen=null, winHi=null, winLo=null;
+let strike=null, strikeAuto=true, yesC=null, noC=null;
+let risk=0.75, autoFlip=true;
+let mc=null, read=null, lock=null;
+let model={a:1,b:0,s:1,w:{},n:0};
+let samples=[], record={w:0,l:0,skips:0,streak:0,best:0,worst:0,hist:[],calls:[],bsum:0,bn:0};
+let stream=[], mcMs=0, mcAt=0, ready=false;
+let forceLock=false, forceSide=false, dropLock=false, lastAgainst=null;
+const FLIP_DEADLINE=45000, FLIP_BUDGET=4, MIN_FLIP_GAP=90000;
+/* Momentum's total budget across the remaining window, as a fraction of one
+   sigma, and the most that persistence is allowed to stretch it. Worst case is
+   the product — 0.47 sigma, or a 50/50 pushed to about 68%. */
+const DRIFT_SIGMA_BUDGET=0.35, PERSIST_MULT_MAX=1.35;
+
+BKEYS.forEach(k=>model.w[k]=0);
+
+/* ---------------- storage ---------------- */
+const LS={model:"edge_model",samples:"edge_samples",rec:"edge_record",lock:"edge_lock",
+          cfg:"edge_cfg",schema:"edge_schema"};
+let pendingSchemaNote=null;
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function load(k,d){try{const j=JSON.parse(localStorage.getItem(k));return j==null?d:j;}catch(e){return d;}}
+function loadAll(){
+  /* Samples carry block values whose shape is versioned. A stale set would
+     feed zeros into every block added since it was written, so it is dropped —
+     but the W/L record and the settled-call log survive, because those are
+     your history, not the model's inputs. */
+  const ver=load(LS.schema,1);
+  if(ver!==SCHEMA){
+    save(LS.samples,[]); save(LS.model,null); save(LS.schema,SCHEMA);
+    pendingSchemaNote=ver;
+  }
+  const m=load(LS.model,null);
+  if(m&&m.w){model.a=m.a;model.b=m.b;model.s=m.s;model.n=m.n||0;BKEYS.forEach(k=>model.w[k]=m.w[k]||0);}
+  samples=load(LS.samples,[]);
+  const r=load(LS.rec,null); if(r)record=Object.assign(record,r);
+  const c=load(LS.cfg,null);
+  if(c){ if(c.risk!=null)risk=c.risk; if(c.autoFlip!=null)autoFlip=c.autoFlip;
+         if(c.strike!=null){strike=c.strike;strikeAuto=false;}
+         if(c.yesC!=null)yesC=c.yesC; if(c.noC!=null)noC=c.noC; }
+  lock=load(LS.lock,null);
+}
+const saveModel=()=>save(LS.model,model);
+const saveSamples=()=>save(LS.samples,samples.slice(-400));
+const saveRec=()=>save(LS.rec,record);
+const saveLock=()=>save(LS.lock,lock);
+const saveCfg=()=>save(LS.cfg,{risk,autoFlip,strike:strikeAuto?null:strike,yesC,noC});
+
+/* ---------------- stream log ---------------- */
+function log(txt,cls){
+  stream.push({t:new Date(),x:txt,c:cls||""});
+  if(stream.length>90)stream=stream.slice(-60);
+  renderStream();
+}
+
+/* ---------------- indicators ---------------- */
+function emaSeries(v,n){const k=2/(n+1);let e=v[0],o=[e];for(let i=1;i<v.length;i++){e=v[i]*k+e*(1-k);o.push(e);}return o;}
+const ema=(v,n)=>emaSeries(v,n).pop();
+function rsi(c,n){n=n||14;if(c.length<n+1)return 50;let g=0,l=0;
+  for(let i=c.length-n;i<c.length;i++){const d=c[i]-c[i-1];d>=0?g+=d:l-=d;}
+  g/=n;l/=n;return l===0?100:100-100/(1+g/l);}
+function bollinger(c,n,k){n=n||20;k=k||2;if(c.length<n)return null;
+  const s=c.slice(-n),m=s.reduce((a,b)=>a+b,0)/n;
+  const sd=Math.sqrt(s.reduce((a,b)=>a+(b-m)*(b-m),0)/n);
+  const u=m+k*sd,d=m-k*sd;return {m,u,d,sd,pctB:u===d?0.5:(c[c.length-1]-d)/(u-d)};}
+function atr(cs,n){n=n||14;if(cs.length<n+1)return null;let s=0;
+  for(let i=cs.length-n;i<cs.length;i++){const p=cs[i-1].c;
+    s+=Math.max(cs[i].h-cs[i].l,Math.abs(cs[i].h-p),Math.abs(cs[i].l-p));}
+  return s/n;}
+function roc(c,n){if(c.length<n+1)return 0;return (c[c.length-1]-c[c.length-1-n])/c[c.length-1-n]*100;}
+function efficiency(c,n){n=n||14;if(c.length<n+1)return 0;const s=c.slice(-n-1);
+  let path=0;for(let i=1;i<s.length;i++)path+=Math.abs(s[i]-s[i-1]);
+  return path===0?0:Math.abs(s[s.length-1]-s[0])/path;}
+
+/* ---------------- feeds ---------------- */
+function setFeed(ok,src){
+  $("feedDot").className="dot "+(ok?"ok":"err");
+  $("feedTxt").textContent=ok?(src||"coinbase ws"):"reconnecting";
+}
+function startWS(){
+  if(typeof WebSocket==="undefined")return;
+  try{
+    const ws=new WebSocket("wss://ws-feed.exchange.coinbase.com");
+    ws.onopen=()=>{ws.send(JSON.stringify({type:"subscribe",product_ids:["BTC-USD"],channels:["matches"]}));log("tape feed connected · coinbase matches","b");};
+    ws.onmessage=e=>{
+      const m=JSON.parse(e.data);
+      if(m.type==="match"||m.type==="last_match"){
+        wsPrice=parseFloat(m.price); lastWsTick=Date.now();
+        // price is kept per print so the tape can be sliced against the strike
+        tape.push({t:lastWsTick,side:m.side,sz:parseFloat(m.size)||0,p:wsPrice});
+        if(tape.length>6000)tape=tape.slice(-3000);
+      }
+    };
+    ws.onclose=()=>{setFeed(false);setTimeout(startWS,3000);};
+    ws.onerror=()=>{try{ws.close();}catch(e){}};
+  }catch(e){}
+}
+/* maker side "sell" means an aggressive BUYER lifted the offer */
+function tapeRead(ms){
+  const cut=Date.now()-ms;
+  let b=0,s=0,n=0;
+  for(let i=tape.length-1;i>=0;i--){
+    if(tape[i].t<cut)break;
+    n++; tape[i].side==="sell"?b+=tape[i].sz:s+=tape[i].sz;
+  }
+  return {r:(b+s)>0?(b-s)/(b+s):0,n};
+}
+/* Large prints only. The size threshold is the 75th percentile of the window's
+   OWN prints, so "big" adapts to whatever the tape looks like right now rather
+   than to a constant that goes stale the moment volume regime changes. */
+function tapeWhale(ms){
+  const cut=Date.now()-ms, w=[];
+  for(let i=tape.length-1;i>=0;i--){ if(tape[i].t<cut)break; w.push(tape[i]); }
+  if(w.length<20)return {r:0,n:0,active:false};
+  const sz=w.map(x=>x.sz).sort((a,b)=>a-b);
+  const thr=sz[Math.floor(sz.length*0.75)];
+  let b=0,s=0,n=0;
+  w.forEach(x=>{if(x.sz>=thr){n++; x.side==="sell"?b+=x.sz:s+=x.sz;}});
+  return {r:(b+s)>0?(b-s)/(b+s):0,n,active:n>=5};
+}
+/* Value acceptance: what share of recent trade VOLUME actually printed on the
+   YES side of the strike. "Price is above the line" and "the market has
+   accepted that level" are different claims, and the gap between them is
+   where 15-minute reversion lives. */
+function tapeAccept(ms,k){
+  if(k==null)return {f:null,n:0,active:false};
+  const cut=Date.now()-ms; let above=0,below=0,n=0;
+  for(let i=tape.length-1;i>=0;i--){
+    if(tape[i].t<cut)break;
+    if(tape[i].p==null)continue;
+    n++; tape[i].p>=k?above+=tape[i].sz:below+=tape[i].sz;
+  }
+  const tot=above+below;
+  return {f:tot>0?above/tot:null,n,active:n>=15};
+}
+
+/* Non-directional regime stats. These do NOT feed the directional tilt — they
+   retune the simulation itself, which is where volatility and mean-reversion
+   information actually belongs. */
+function logRets(){
+  const c=candles.map(x=>x.c), out=[];
+  for(let i=1;i<c.length;i++){const r=Math.log(c[i]/c[i-1]); if(isFinite(r))out.push(r);}
+  return out;
+}
+const sdOf=a=>{if(!a.length)return 0;const m=a.reduce((x,y)=>x+y,0)/a.length;
+  return Math.sqrt(Math.max(0,a.reduce((s,v)=>s+(v-m)*(v-m),0)/a.length));};
+function volRegime(){
+  const lr=logRets();
+  if(lr.length<70)return {exp:1,shortSd:null,longSd:null};
+  const s=sdOf(lr.slice(-10)), l=sdOf(lr.slice(-60));
+  return {exp:l>0?clamp(s/l,0.25,4):1, shortSd:s, longSd:l};
+}
+/* Lag-1 autocorrelation of 1-minute returns. Positive means moves are being
+   followed through on and momentum is worth something; negative means the
+   market is fading its own moves and momentum should be trusted less. */
+function persistence(){
+  const lr=logRets();
+  if(lr.length<40)return 0;
+  const a=lr.slice(-60), m=a.reduce((x,y)=>x+y,0)/a.length;
+  let num=0,den=0;
+  for(let i=1;i<a.length;i++)num+=(a[i]-m)*(a[i-1]-m);
+  for(let i=0;i<a.length;i++)den+=(a[i]-m)*(a[i]-m);
+  return den>0?clamp(num/den,-1,1):0;
+}
+async function fetchCandles(){
+  try{
+    const r=await fetch("https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=60",{cache:"no-store"});
+    const j=await r.json();
+    if(!Array.isArray(j))return;
+    candles=j.map(a=>({t:a[0]*1000,l:a[1],h:a[2],o:a[3],c:a[4],v:a[5]})).sort((a,b)=>a.t-b.t);
+    if(!price&&candles.length)price=candles[candles.length-1].c;
+  }catch(e){}
+}
+async function fetchSpot(){
+  try{
+    const r=await fetch("https://api.coinbase.com/v2/prices/BTC-USD/spot",{cache:"no-store"});
+    const j=await r.json(); return parseFloat(j.data.amount);
+  }catch(e){return null;}
+}
+async function fetchBook(){
+  try{
+    const r=await fetch("https://api.exchange.coinbase.com/products/BTC-USD/book?level=2",{cache:"no-store"});
+    const j=await r.json();
+    const bid0=parseFloat(j.bids[0][0]), ask0=parseFloat(j.asks[0][0]);
+    const mid=(bid0+ask0)/2, far=mid*0.0025, near=mid*0.0005;
+    let b=0,a=0,bn=0,an=0;
+    j.bids.forEach(x=>{const d=mid-parseFloat(x[0]),s=parseFloat(x[1]);
+      if(d<=far){b+=s; if(d<=near)bn+=s;}});
+    j.asks.forEach(x=>{const d=parseFloat(x[0])-mid,s=parseFloat(x[1]);
+      if(d<=far){a+=s; if(d<=near)an+=s;}});
+    obImb=(b+a)>0?(b-a)/(b+a):0;
+    /* Depth CONCENTRATION, not depth size. A side whose liquidity sits tight to
+       the mid is defended; a side that is thin up close and fat further out
+       gives way easily. That is a different question from who has more total
+       size, which is what obImb already answers. */
+    obPress=(b>0&&a>0)?clamp(bn/b-an/a,-1,1):null;
+    obSpread=ask0-bid0;                                      // dollars: bp rounds to 0 here
+  }catch(e){}
+}
+async function fetchFng(){
+  try{const r=await fetch("https://api.alternative.me/fng/");const j=await r.json();
+    fng={v:+j.data[0].value,label:j.data[0].value_classification};}catch(e){}
+}
+const POS=["surge","rally","soar","bull","record","高","gain","jump","adopt","approve","inflow","buy","upgrade","support","breakout","high","etf","institution"];
+const NEG=["crash","plunge","drop","bear","hack","ban","sell-off","selloff","outflow","lawsuit","fear","liquidat","dump","reject","fall","slump","warn","down"];
+async function fetchNews(){
+  try{
+    const r=await fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent("https://cointelegraph.com/rss/tag/bitcoin"));
+    const j=await r.json();
+    if(!j.items)return;
+    const items=j.items.slice(0,10).map(i=>{
+      const t=String(i.title).toLowerCase();
+      let s=0; POS.forEach(w=>{if(t.includes(w))s++;}); NEG.forEach(w=>{if(t.includes(w))s--;});
+      return {title:String(i.title),at:new Date(i.pubDate).getTime(),s:clamp(s,-2,2)};
+    });
+    let sc=0,n=0;
+    items.forEach(i=>{if(i.s!==0){sc+=i.s;n++;}});
+    const fresh=items.filter(i=>Date.now()-i.at<45*60000).length;
+    news={score:n?clamp(sc/(n*2),-1,1):0,at:Date.now(),n:items.length,fresh,items};
+    renderWire();
+    log("news wire · "+items.length+" headlines · tone "+(news.score>=0?"+":"")+news.score.toFixed(2),"b");
+  }catch(e){}
+}
+async function fetchMood(){
+  try{
+    const r=await fetch("https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&market_data=false&community_data=true&developer_data=false");
+    const j=await r.json();
+    if(j.sentiment_votes_up_percentage!=null)mood=j.sentiment_votes_up_percentage;
+  }catch(e){}
+}
+
+/* ---------------- windows ---------------- */
+function windowStartFor(t){const d=new Date(t);d.setSeconds(0,0);d.setMinutes(Math.floor(d.getMinutes()/15)*15);return d;}
+
+function onTick(px,now){
+  const lastPx=price;                    // last print BEFORE the boundary = settlement
+  price=px;
+  const ws=windowStartFor(now);
+  if(!windowStart||ws.getTime()!==windowStart.getTime()){
+    const prev=windowStart;
+    if(prev)settleWindow(prev.getTime(),lastPx!=null?lastPx:px);
+    windowStart=ws; windowOpen=px; winHi=px; winLo=px;
+    if(strikeAuto)strike=px;
+    log("── window "+hhmm(ws)+" → "+hhmm(new Date(ws.getTime()+WIN_MS))+" · open "+short(px),"hi");
+    if(strikeAuto)log("strike auto-set to window open "+short(px)+" — paste a Kalshi strike to override","y");
+  }else{
+    winHi=Math.max(winHi,px); winLo=Math.min(winLo,px);
+    if(strikeAuto&&strike==null)strike=windowOpen!=null?windowOpen:px;   // never sit strikeless
+  }
+}
+
+/* ---------------- settlement + learning ---------------- */
+function settleWindow(key,settlePx){
+  if(!lock||lock.key!==key){lock=null;saveLock();return;}
+  const yes = settlePx >= lock.strike;
+  record.hist.push(lock.dir===0?"s":((lock.dir===1)===yes?"w":"l"));
+  if(record.hist.length>200)record.hist=record.hist.slice(-120);
+
+  if(lock.dir===0){
+    record.skips++;
+    log("settled "+short(settlePx)+" · "+(yes?"YES":"NO")+" · we sat out","y");
+  }else{
+    const hit=(lock.dir===1)===yes;
+    if(hit){record.w++;record.streak=record.streak>=0?record.streak+1:1;record.best=Math.max(record.best,record.streak);}
+    else   {record.l++;record.streak=record.streak<=0?record.streak-1:-1;record.worst=Math.min(record.worst,record.streak);}
+    log("settled "+short(settlePx)+" · "+(yes?"YES":"NO")+" · called "+(lock.dir===1?"YES":"NO")+" @ "+pct(lock.p,0)+" → "+(hit?"WIN":"LOSS"),hit?"g":"r");
+  }
+  // Brier is scored on the raw close-above probability, so sitting out is graded too
+  const pz = lock.pYes;
+  record.bsum += Math.pow(pz-(yes?1:0),2); record.bn++;
+
+  if(!record.calls)record.calls=[];
+  record.calls.push({t:hhmm(new Date(key)),dir:lock.dir,p:pct(lock.p,1),
+                     k:short(lock.strike).replace("$",""),s:short(settlePx).replace("$",""),
+                     hit:lock.dir!==0&&((lock.dir===1)===yes)});
+  if(record.calls.length>40)record.calls=record.calls.slice(-24);
+
+  samples.push({zmc:lock.zmc,x:lock.x,y:yes?1:0,p:pz,t:Date.now()});
+  if(samples.length>400)samples=samples.slice(-300);
+  saveSamples(); saveRec(); renderHist();
+  train();
+  lock=null; saveLock();
+}
+
+/* How far the learned layer may tilt the simulation, in logits. The 14 feature
+   weights are a correction term, not a second opinion: even fully aligned and
+   fully saturated they can move a 50/50 to roughly 82/18 and no further. The
+   Monte Carlo stays the backbone of every number on the screen. */
+const FEAT_Z_CAP=1.5;
+function featZ(B,w){
+  let z=0;
+  for(let i=0;i<BKEYS.length;i++)z+=(w[BKEYS[i]]||0)*(B[BKEYS[i]]||0);
+  return clamp(z,-FEAT_Z_CAP,FEAT_Z_CAP);
+}
+
+/* Staged fitting. Even five block weights can separate a dozen data points, so
+   a naive refit on a young track record drives every weight to its clamp and
+   the app starts confidently distrusting the one component doing real work.
+   Parameters unlock only once enough windows have settled to pay for them:
+   <12 nothing, 12–23 the two scalars, 24+ the five block weights. */
+const FIT_SCALARS=12, FIT_BLOCKS=24, FIT_CALIB=25;
+function train(){
+  const S=samples.slice(-240), m=S.length;
+  model.n=m;
+  if(m<FIT_SCALARS){
+    model.a=1; model.b=0; model.s=1; BKEYS.forEach(k=>model.w[k]=0);
+    saveModel();
+    log("holding the simulation prior · "+m+"/"+FIT_SCALARS+" settled windows before any fit","y");
+    return;
+  }
+  const fitB = m>=FIT_BLOCKS;
+  const lr=0.06, epochs=80, l2=0.025*Math.max(1,120/m);
+  let a=1,b=0; const w={}; BKEYS.forEach(k=>w[k]=0);
+  for(let e=0;e<epochs;e++){
+    let ga=0,gb=0; const gw={}; BKEYS.forEach(k=>gw[k]=0);
+    for(let i=0;i<m;i++){
+      const s=S[i];
+      const zf=fitB?featZ(s.x,w):0;
+      const d=sigmoid(a*s.zmc+b+zf)-s.y;
+      ga+=d*s.zmc; gb+=d;
+      // gradient is zero through a saturated cap, which is the point
+      if(fitB&&Math.abs(zf)<FEAT_Z_CAP)
+        for(let f=0;f<BKEYS.length;f++)gw[BKEYS[f]]+=d*(s.x[BKEYS[f]]||0);
+    }
+    a=clamp(a-lr*(ga/m+l2*(a-1)),0.40,1.80);
+    b=clamp(b-lr*(gb/m+l2*b),-0.80,0.80);
+    if(fitB)for(let f=0;f<BKEYS.length;f++){const k=BKEYS[f];
+      w[k]=clamp(w[k]-lr*(gw[k]/m+l2*w[k]),-0.55,0.55);}
+  }
+  // calibration: 1-D sharpness search, only with enough evidence to mean anything
+  let s=1;
+  if(m>=FIT_CALIB){
+    let bl=Infinity;
+    for(let t=0.40;t<=1.351;t+=0.05){
+      let ll=0;
+      for(let i=0;i<m;i++){
+        const sm=S[i];
+        const p=clamp(sigmoid((a*sm.zmc+b+(fitB?featZ(sm.x,w):0))*t),1e-6,1-1e-6);
+        ll-=sm.y*Math.log(p)+(1-sm.y)*Math.log(1-p);
+      }
+      if(ll<bl){bl=ll;s=t;}
+    }
+  }
+  const lbl=k=>(BLOCKS.find(b=>b.k===k)||{label:k}).label.toLowerCase();
+  const moved=BKEYS.map(k=>[k,w[k]]).sort((p,q)=>Math.abs(q[1])-Math.abs(p[1])).slice(0,3)
+              .filter(p=>Math.abs(p[1])>0.02).map(p=>lbl(p[0])+" "+(p[1]>=0?"+":"")+p[1].toFixed(2)).join(" · ");
+  model={a,b,s,w,n:m}; saveModel();
+  log("refit on "+m+" windows · mc×"+a.toFixed(2)+" · sharpness ×"+s.toFixed(2)+
+      (fitB?(moved?" · "+moved:""):" · block weights locked until "+FIT_BLOCKS),"y");
+}
+
+/* ---------------- Monte Carlo settlement ---------------- */
+/* Pools are DE-MEANED on purpose: the bootstrap supplies volatility, fat tails
+   and autocorrelation only. All directional drift enters through the single
+   capped `drift` term below, so a trending session cannot smuggle a second,
+   uncapped drift into the simulation. */
+function returnPool(){
+  const c=candles.map(x=>x.c);
+  if(c.length<25)return null;
+  const all=[],recent=[];
+  for(let i=1;i<c.length;i++){
+    const r=Math.log(c[i]/c[i-1]);
+    if(isFinite(r)){all.push(r); if(i>=c.length-60)recent.push(r);}
+  }
+  if(all.length<24)return null;
+  const rec = recent.length>=25?recent:all;
+  const demean=a=>{const m=a.reduce((x,y)=>x+y,0)/a.length;return a.map(v=>v-m);};
+  const variance=a=>{const m=a.reduce((x,y)=>x+y,0)/a.length;
+    return Math.max(0,a.reduce((s,v)=>s+(v-m)*(v-m),0)/a.length);};
+  /* Recency weight is adaptive, not fixed. When short-horizon volatility is
+     running hot relative to the hour, five-hour-old returns describe a market
+     that no longer exists, so the sim leans harder on what just happened.
+     When vol is calm the wider pool gives better tail coverage. */
+  const vr=volRegime();
+  const recW=clamp(0.55+(vr.exp-1)*0.5,0.50,0.90);
+  /* The sim draws its blocks at exactly this weight, so the volatility it
+     ACTUALLY runs at is this blend — not the all-history sd. The drift cap is
+     expressed as a fraction of sigma, so if the two diverge the cap stops
+     binding where it was meant to. Report the blend. */
+  const sd=Math.sqrt(recW*variance(rec)+(1-recW)*variance(all));
+  return {all:demean(all),recent:demean(rec),sd,rawN:all.length,recN:rec.length,
+          recW,volExp:vr.exp};
+}
+function runMC(px,k,remainMs,driftPerMin){
+  const pool=returnPool(); if(!pool||k==null)return null;
+  const t0=performance.now();
+  const minsLeft=Math.max(remainMs/60000,1/60);
+  const steps=Math.max(1,Math.ceil(minsLeft));
+  const lastFrac=minsLeft-(steps-1);
+  const A=pool.all,R=pool.recent,la=A.length,lr=R.length;
+  const lk=Math.log(k), lpx=Math.log(px);
+  const ends=new Float64Array(MC_PATHS);
+  let up=0,touch=0;
+  const startAbove=px>=k;
+  for(let p=0;p<MC_PATHS;p++){
+    let lp=lpx, crossed=false, src=null, idx=0;
+    for(let s=0;s<steps;s++){
+      if(s%BLOCK===0){
+        const useRecent=Math.random()<pool.recW;
+        src=useRecent?R:A; idx=(Math.random()*(useRecent?lr:la))|0;
+      }
+      const r=src[idx%src.length]; idx++;
+      const sc=(s===steps-1)?lastFrac:1;
+      lp+=r*Math.sqrt(sc)+driftPerMin*sc;
+      if(!crossed && ((startAbove && lp<lk) || (!startAbove && lp>=lk))) crossed=true;
+    }
+    const e=Math.exp(lp);
+    ends[p]=e;
+    if(e>=k)up++;
+    if(crossed)touch++;
+  }
+  const sorted=Array.prototype.slice.call(ends).sort((a,b)=>a-b);
+  const q=f=>sorted[clamp(Math.floor(f*MC_PATHS),0,MC_PATHS-1)];
+  mcMs=performance.now()-t0;
+  return {p:clamp(up/MC_PATHS,0.004,0.996),touch:touch/MC_PATHS,
+          q10:q(0.10),q25:q(0.25),q50:q(0.50),q75:q(0.75),q90:q(0.90),
+          sigMin:pool.sd*px, minsLeft, poolN:pool.rawN, recN:pool.recN,
+          recW:pool.recW, volExp:pool.volExp};
+}
+
+/* ---------------- features ---------------- */
+function buildFeatures(px,remainMs){
+  const c=candles.map(x=>x.c);
+  const F={}, meta=[], active={};
+  /* `on` marks whether the signal has data behind it. An inactive signal is
+     excluded from its block average rather than counted as a neutral zero —
+     otherwise a book that has not loaded quietly votes "no opinion" and dilutes
+     a tape that is screaming. */
+  const add=(key,val,label,shown,note,on)=>{
+    F[key]=clamp(val||0,-1,1);
+    active[key]=(on===undefined)?true:!!on;
+    meta.push({key,v:F[key],label,shown,note,on:active[key]});
+  };
+
+  /* Scalings are chosen so the ±1 clamp is a genuine extreme, not a Tuesday.
+     A feature that sits pinned at 1.00 carries no information for the logistic
+     layer to weigh — "strong" and "berserk" have to stay distinguishable. */
+  const atrV=atr(candles,14)||px*0.0006;
+  const e9=ema(c.slice(-40),9), e21=ema(c.slice(-70),21), e50=ema(c.slice(-90),50);
+  add("trend",(e9-e21)/(atrV*2.2),"Trend EMA 9/21",(e9-e21>=0?"+":"")+(e9-e21).toFixed(1),
+      e9>e21?"fast above slow":"fast below slow");
+
+  const e12=emaSeries(c,12),e26=emaSeries(c,26);
+  const macdL=e12.map((v,i)=>v-e26[i]), sigL=emaSeries(macdL,9);
+  const hist=macdL[macdL.length-1]-sigL[sigL.length-1];
+  const prevH=macdL[macdL.length-2]-sigL[sigL.length-2];
+  add("macd",hist/(atrV*1.4),"MACD histogram",(hist>=0?"+":"")+hist.toFixed(2),
+      Math.abs(hist)>Math.abs(prevH)?"expanding":"fading");
+
+  /* RSI and %B are deliberately NON-monotonic. Rising RSI is momentum; RSI 95
+     is exhaustion, and a bar that screams BUY next to a note reading
+     "overbought" is the model lying to you. Both roll off past the extreme and
+     cross into negative territory, so the picture and the words agree. */
+  const r=rsi(c,14);
+  let rv=(r-50)/28;
+  if(r>75)      rv=(25/28)*(1-(r-75)/25*1.6);
+  else if(r<25) rv=(-25/28)*(1-(25-r)/25*1.6);
+  add("rsi",rv,"RSI 14",r.toFixed(1),
+      r>75?(rv<0?"overbought — fading":"overbought"):r<25?(rv>0?"oversold — bid":"oversold"):
+      r>56?"momentum up":r<44?"momentum down":"neutral zone");
+
+  const bb=bollinger(c,20,2);
+  let bv=0;
+  if(bb){
+    bv=(bb.pctB-0.5)*2.2;
+    if(bb.pctB>1)      bv=1.1-(bb.pctB-1)*4;
+    else if(bb.pctB<0) bv=-1.1-bb.pctB*4;
+  }
+  add("bb",bv,"Bollinger %B",bb?Math.round(bb.pctB*100)+"%":"—",
+      !bb?"—":bb.pctB>1?(bv<0?"stretched past the band":"breaking the upper band"):
+      bb.pctB<0?(bv>0?"stretched below the band":"breaking the lower band"):
+      bb.pctB>0.9?"riding upper band":bb.pctB<0.1?"pinned to lower":"inside bands");
+
+  const rc=roc(c,10);
+  add("roc",rc/0.35,"Momentum 10m",(rc>=0?"+":"")+rc.toFixed(3)+"%", rc>0?"drifting up":"drifting down");
+
+  const er=efficiency(c,14);
+  const regimeDir=(e9-e21)>=0?1:-1;
+  add("regime",er*1.35*regimeDir,"Regime · efficiency",er.toFixed(2),
+      er>0.45?"TRENDING":er>0.22?"MIXED":"CHOPPY");
+
+  const vols=candles.map(x=>x.v||0);
+  const avgV=vols.slice(-20).reduce((a,b)=>a+b,0)/Math.max(1,Math.min(20,vols.length));
+  const recV=vols.slice(-3).reduce((a,b)=>a+b,0)/3;
+  const vr=avgV>0?recV/avgV:1;
+  add("volume",clamp((vr-1)*1.1,-1,1)*regimeDir,"Volume conviction",vr.toFixed(2)+"×",
+      vr>1.2?"heavy participation":vr<0.8?"thin — fade risk":"normal");
+
+  const t60=tapeRead(60000), t20=tapeRead(20000), t60b=tapeRead(120000);
+  add("tape",t60.n>=6?t60.r*1.6:0,"Tape aggression 60s",t60.n?(t60.r>=0?"+":"")+t60.r.toFixed(2):"quiet",
+      t60.n?Math.round((Math.abs(t60.r)+1)/2*100)+"% "+(t60.r>=0?"buyers":"sellers"):"no prints",
+      t60.n>=6);
+  const accelOn=t20.n>=4&&t60b.n>=8;
+  add("accel",accelOn?clamp((t20.r-t60b.r)*2,-1,1):0,"Flow acceleration",
+      accelOn?((t20.r-t60b.r>=0?"+":"")+(t20.r-t60b.r).toFixed(2)):"—",
+      !accelOn?"too few prints":t20.r-t60b.r>0.15?"buyers stepping up":
+      t20.r-t60b.r<-0.15?"sellers stepping up":"steady", accelOn);
+
+  add("book",obImb==null?0:obImb*1.8,"Order book ±0.25%",obImb==null?"—":(obImb>=0?"+":"")+obImb.toFixed(2),
+      obImb==null?"loading":Math.round((Math.abs(obImb)+1)/2*100)+"% "+(obImb>=0?"bid depth":"ask depth"),
+      obImb!=null);
+
+  const wh=tapeWhale(180000);
+  add("whale",wh.active?wh.r*1.5:0,"Large prints 3m",wh.active?((wh.r>=0?"+":"")+wh.r.toFixed(2)):"—",
+      wh.active?wh.n+" big trades · "+(wh.r>=0?"accumulating":"distributing"):"not enough size yet",
+      wh.active);
+
+  const ac=tapeAccept(300000,strike);
+  const acv=ac.active&&ac.f!=null?(ac.f-0.5)*2:0;
+  add("accept",acv*0.9,"Strike acceptance",ac.active&&ac.f!=null?Math.round(ac.f*100)+"%":"—",
+      !ac.active?"waiting on prints":
+      Math.abs(acv)<0.2?"balanced around the strike":
+      (acv>0?"volume printing above":"volume printing below"), ac.active);
+
+  add("pressure",obPress==null?0:obPress*2,"Book pressure",
+      obPress==null?"—":(obPress>=0?"+":"")+obPress.toFixed(2),
+      obPress==null?"loading":Math.abs(obPress)<0.05?"evenly stacked":
+      (obPress>0?"bids defended tight":"asks defended tight"), obPress!=null);
+
+  const lc=candles[candles.length-2]||candles[candles.length-1];
+  let wick=0,wnote="none";
+  if(lc){const body=Math.abs(lc.c-lc.o)||1e-9,uw=lc.h-Math.max(lc.o,lc.c),lw=Math.min(lc.o,lc.c)-lc.l;
+    if(lw>body*1.8&&lw>uw){wick=0.8;wnote="buyers defended the low";}
+    else if(uw>body*1.8&&uw>lw){wick=-0.8;wnote="sellers capped the high";}}
+  add("wick",wick,"Wick rejection",wick>0?"lower":wick<0?"upper":"—",wnote);
+
+  const stackUp=e9>e21&&e21>e50, stackDn=e9<e21&&e21<e50;
+  const r30=roc(c,30);
+  const legs=clamp((stackUp?0.45:stackDn?-0.45:0)+clamp(r30/0.45,-0.35,0.35)+er*0.32*regimeDir,-1,1);
+  add("legs",legs,"Trend legs",(legs>=0?"+":"")+legs.toFixed(2),
+      stackUp?"9>21>50 stacked up":stackDn?"9<21<50 stacked down":"stack unresolved");
+
+  /* VWAP is a volume anchor, not another moving average — it answers "where
+     did the money actually change hands", which an EMA cannot. */
+  let vwap=null;
+  {
+    const n=Math.min(60,candles.length);
+    let pv=0,vv=0;
+    for(let i=candles.length-n;i<candles.length;i++){
+      const cd=candles[i], v=cd.v||0;
+      pv+=((cd.h+cd.l+cd.c)/3)*v; vv+=v;
+    }
+    if(vv>0)vwap=pv/vv;
+  }
+  add("vwap",vwap==null?0:(px-vwap)/(atrV*2.5),"VWAP deviation",
+      vwap==null?"—":((px-vwap>=0?"+":"")+(px-vwap).toFixed(0)),
+      vwap==null?"no volume data":(px>=vwap?"trading above value":"trading below value"),
+      vwap!=null);
+
+  /* Multi-timeframe: a 1-minute uptrend inside a 5-minute downtrend is a very
+     different bet from one that has the higher frame behind it. */
+  let mtfOn=false, mtfV=0, mtfNote="not enough history";
+  if(c.length>=150){
+    const c5=[]; for(let i=c.length-1;i>=0&&c5.length<80;i-=5)c5.unshift(c[i]);
+    if(c5.length>=30){
+      const f=ema(c5.slice(-30),9), s=ema(c5.slice(-40),21);
+      mtfV=(f-s)/(atrV*Math.sqrt(5)*2.2); mtfOn=true;
+      const agree=((f-s)>=0)===((e9-e21)>=0);
+      mtfNote=agree?"5m agrees with 1m":"5m fights the 1m read";
+    }
+  }
+  add("mtf",mtfV,"5-min alignment",mtfOn?((mtfV>=0?"+":"")+mtfV.toFixed(2)):"—",mtfNote,mtfOn);
+
+  /* Where price sits inside THIS window's own range — the settlement question
+     is about this window, not the last five hours. Suppressed until the range
+     is wide enough to mean anything. */
+  let rgOn=false, rgV=0, rgNote="range too tight to read";
+  if(winHi!=null&&winLo!=null&&(winHi-winLo)>atrV*0.3){
+    const pos=(px-winLo)/(winHi-winLo);
+    rgV=(pos-0.5)*1.8; rgOn=true;
+    rgNote=pos>0.75?"pressing the window high":pos<0.25?"pinned to the window low":"mid-range";
+  }
+  add("range",rgV,"Window range",rgOn?Math.round(((px-winLo)/(winHi-winLo))*100)+"%":"—",rgNote,rgOn);
+
+  const nfresh = news && Date.now()-news.at<20*60000;
+  add("news",nfresh?news.score*0.7:0,"News wire",news?(news.score>=0?"+":"")+news.score.toFixed(2):"—",
+      news?news.n+" headlines · "+news.fresh+" fresh":"loading", !!nfresh);
+
+  let mv=0; const mp=[];
+  if(fng){mv+=(fng.v-50)/70; mp.push(fng.label.toLowerCase());}
+  if(mood!=null){mv+=(mood-50)/90; mp.push(Math.round(mood)+"% bullish");}
+  add("mood",mv*0.5,"Market mood",fng?String(fng.v):(mood!=null?Math.round(mood)+"%":"—"),
+      mp.length?mp.join(" · "):"loading", !!(fng||mood!=null));
+
+  return {F,meta,active,B:blockVals(F,active),
+          atrV,er,rsiV:r,e9,e21,e50,tape60:t60,vr,hist,vwap,
+          persist:persistence(),vol:volRegime(),spread:obSpread};
+}
+
+/* Each block averages its ACTIVE members only. */
+function blockVals(F,active){
+  const B={};
+  BLOCKS.forEach(b=>{
+    let s=0,n=0;
+    b.feats.forEach(k=>{if(active[k]){s+=F[k]||0;n++;}});
+    B[b.k]=n?s/n:0;
+    B[b.k+"_n"]=n;
+  });
+  return B;
+}
+
+/* The coin-flip band: the ONLY thing that produces a SKIP.
+   Base width falls away fast across the top half of the risk dial, and a
+   controller tightens it further whenever the realised skip rate runs above
+   the target the dial implies — so "it kept sitting out to be safe" is a
+   condition the engine measures and corrects, not a mood. */
+function skipBand(){
+  const base=0.06*Math.pow(1-risk,1.4);
+  const tot=record.w+record.l+record.skips;
+  if(tot<8)return {band:base,base,obs:null,target:0.30*(1-risk),tight:1};
+  const obs=record.skips/tot, target=0.30*(1-risk);
+  const tight=obs>target?clamp(1-(obs-target)*2.5,0.25,1):1;
+  return {band:base*tight,base,obs,target,tight};
+}
+
+/* What one contract on the given side costs, in dollars. NO defaults to
+   1 − YES when only one leg has been entered. */
+function costFor(dir){
+  if(dir===0)return null;
+  const yc=yesC!=null?yesC/100:null;
+  const nc=noC!=null?noC/100:(yesC!=null?1-yesC/100:null);
+  return dir===1?yc:nc;
+}
+
+/* ---------------- the read ---------------- */
+function computeRead(now){
+  if(candles.length<30||price==null||windowStart==null)return null;
+  const remain=Math.max(0,windowStart.getTime()+WIN_MS-now);
+  const fx=buildFeatures(price,remain);
+
+  // drift: momentum + tape tilt, heavily shrunk and hard-capped against vol.
+  // This is the ONLY directional input to the simulation (the pool is de-meaned).
+  const pool=returnPool();
+  const sd=pool?pool.sd:0;
+  const mom=(roc(candles.map(c=>c.c),5)/100)/5;
+  let drift=mom*0.35 + fx.tape60.r*sd*0.18;
+  /* Momentum may never contribute more than 35% of ONE sigma across the time
+     that is actually left. A flat per-minute cap looks safe and isn't: at
+     0.30σ/min it accumulates to 4.5σ over a full window and swamps the noise.
+     Scaling by 1/√minsLeft means momentum is allowed to matter in the last
+     minute and is nearly muted with fifteen to go — which is how 15-minute
+     BTC actually behaves. */
+  const minsLeft=Math.max(remain/60000,0.25);
+  /* ...and the allowance itself flexes with whether momentum is currently
+     worth anything. When 1-minute returns are autocorrelated the market is
+     following through and momentum earns more room; when it is fading its own
+     moves, momentum gets squeezed toward nothing. */
+  const persistMult=clamp(1+fx.persist*1.5,0.30,PERSIST_MULT_MAX);
+  const driftCap=sd>0?DRIFT_SIGMA_BUDGET*sd/Math.sqrt(minsLeft)*persistMult:0;
+  drift=clamp(drift,-driftCap,driftCap);
+
+  const m=runMC(price,strike,remain,drift);
+  if(!m)return null;
+  mc=m; mcAt=Date.now();
+
+  const zmc=logit(m.p);
+  const z=model.a*zmc+model.b+featZ(fx.B,model.w);   // same cap the fit was trained under
+  const pRaw=sigmoid(z);
+  const pYes=clamp(sigmoid(z*model.s),0.005,0.995);
+
+  // ---- decision ----
+  const sb=skipBand(), band=sb.band;
+  const lean=pYes-0.5;
+  let dir=0,reason="";
+  if(Math.abs(lean)<band){
+    dir=0;
+    reason="genuine coin flip — inside the ±"+(band*100).toFixed(2)+" point band";
+  } else dir=lean>0?1:-1;
+
+  const p = dir===-1?1-pYes:pYes;     // probability of the side we're taking
+  const conv=Math.abs(lean)*2;
+
+  // ---- market edge ----
+  let edge=null,kelly=null,mktP=null;
+  const yc=yesC!=null?yesC/100:null;
+  if(yc!=null)mktP=yc;
+  const cost = dir!==0?costFor(dir):null;
+  if(cost!=null&&cost>0&&cost<1){edge=p-cost;kelly=clamp((p-cost)/(1-cost),0,1);}
+
+  // ---- sizing carries the risk, not the skip ----
+  const flowSign=fx.tape60.n>=6?(fx.tape60.r>0.12?1:fx.tape60.r<-0.12?-1:0):0;
+  const bookSign=obImb==null?0:(obImb>0.12?1:obImb<-0.12?-1:0);
+  const priceDir=dir===1?1:-1;
+  const fights=dir!==0&&flowSign!==0&&flowSign===-priceDir&&bookSign!==0&&bookSign===-priceDir;
+  let tier=0;
+  if(dir!==0){
+    tier = conv>=0.28?3 : conv>=0.13?2 : 1;
+    if(edge!=null&&edge<-0.02)tier--;
+    if(fights)tier--;
+    if(fx.er<0.18&&conv<0.30)tier--;
+    tier=clamp(tier,1,3);
+  }
+
+  return {pYes,pRaw,p,dir,reason,conv,tier,edge,kelly,cost,mktP,mc:m,fx,zmc,remain,band,sb,fights,drift,driftCap,sd};
+}
+
+/* ---------------- lock ---------------- */
+function updateLock(rd,now){
+  if(!rd||!windowStart)return;
+  const key=windowStart.getTime(), elapsed=now-key, remain=rd.remain;
+  const snap=()=>({key,dir:rd.dir,p:rd.p,pYes:rd.pYes,price,strike,at:now,tier:rd.tier,
+                   zmc:rd.zmc,x:rd.fx.B,edge:rd.edge,cost:rd.cost,
+                   flips:lock&&lock.key===key?(lock.flips||0):0});
+
+  if(lock&&lock.key!==key){lock=null;}
+
+  if(dropLock){
+    dropLock=false; forceLock=false; forceSide=false;
+    if(lock){lock=null;saveLock();log("lock dropped — headline follows the live read until you re-lock","y");}
+    return;
+  }
+  /* Manual override: take the other side at the live price. From a SKIP it
+     takes whichever side the model currently leans, however slightly. */
+  if(forceSide){
+    forceSide=false;
+    if(lock){
+      const want = lock.dir===0 ? (rd.pYes>=0.5?1:-1) : -lock.dir;
+      const from = lock.dir===0?"SKIP":lock.dir===1?"YES":"NO";
+      const f=(lock.flips||0)+1;
+      lock=snap();
+      lock.dir=want;
+      lock.p = want===1?rd.pYes:1-rd.pYes;
+      lock.cost = costFor(want);
+      lock.edge = (lock.cost!=null&&lock.cost>0&&lock.cost<1)?lock.p-lock.cost:null;
+      lock.flips=f; lock.manual=true; saveLock();
+      log("manual switch "+from+" → "+(want===1?"YES":"NO")+" @ "+pct(lock.p,1)+" · "+mss(remain)+" left","hi");
+      return;
+    }
+  }
+
+  if(forceLock){
+    const was=lock; lock=snap(); if(was&&was.key===key)lock.flips=(was.flips||0)+1;
+    lock.manual=true; saveLock();
+    log("re-read locked · "+(lock.dir===1?"YES":lock.dir===-1?"NO":"SKIP")+" @ "+pct(lock.p,1),"hi");
+    forceLock=false; return;
+  }
+  forceLock=false;
+
+  if(!lock){
+    if(elapsed>=40000){ lock=snap(); saveLock();
+      log("locked "+(lock.dir===1?"YES":lock.dir===-1?"NO":"SKIP")+" @ "+pct(lock.p,1)+
+          " · strike "+short(strike)+" · size "+["SKIP","PROBE","HALF","FULL"][lock.dir===0?0:lock.tier],
+          lock.dir===1?"g":lock.dir===-1?"r":"y");
+    }
+    return;
+  }
+  /* Auto-flip: an honest model that changes its mind should be allowed to say
+     so. The old limits (2 flips, dead with 2:30 left) meant the headline froze
+     for most of the window while the model quietly disagreed with it. Now it
+     stays live until the last 45 seconds and has a real budget. */
+  /* Dwell time is what stops this from thrashing. A model hovering near 50/50
+     will cross the flip threshold repeatedly, and answering every crossing
+     whipsaws the position for no information gain. It must hold the new view
+     for a while before the lock follows it. */
+  const sinceFlip = now-(lock.lastFlip||lock.at||now);
+  if(autoFlip&&remain>FLIP_DEADLINE&&rd.dir!==0&&rd.dir!==lock.dir&&
+     rd.conv>=Math.max(0.08,rd.band*2.2)&&(lock.flips||0)<FLIP_BUDGET&&
+     sinceFlip>=MIN_FLIP_GAP){
+    const from=lock.dir===0?"SKIP":lock.dir===1?"YES":"NO";
+    const f=(lock.flips||0)+1;
+    lock=snap(); lock.flips=f; lock.lastFlip=now; saveLock();
+    log("auto-flip "+from+" → "+(rd.dir===1?"YES":"NO")+" @ "+pct(rd.p,1)+
+        " · "+mss(remain)+" left · "+f+"/"+FLIP_BUDGET,"y");
+  }
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function renderRail(now){
+  if(price!=null){
+    $("px").textContent="$"+price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    if(windowOpen){const d=price-windowOpen,dp=d/windowOpen*100;
+      const el=$("pxd");
+      el.textContent=(d>=0?"+":"−")+money(d)+"  "+(d>=0?"+":"−")+Math.abs(dp).toFixed(3)+"%  since open";
+      el.className="d "+(d>=0?"up":"dn");}
+  }
+  if(windowStart){
+    const end=windowStart.getTime()+WIN_MS, remain=Math.max(0,end-now);
+    $("cd").textContent=mss(remain);
+    $("cdl").textContent="closes "+hhmm(new Date(end));
+    const p=clamp((WIN_MS-remain)/WIN_MS,0,1);
+    const bar=$("progBar"); bar.style.width=(p*100).toFixed(2)+"%";
+    bar.className=remain<120000?"hot":"";
+  }
+  const busy=Date.now()-mcAt<2500;
+  $("mcDot").className="dot "+(busy?"busy":"ok");
+  $("mcTxt").textContent=mc?(MC_PATHS.toLocaleString()+" paths · "+mcMs.toFixed(1)+"ms"):"model idle";
+}
+
+function renderVerdict(rd,now){
+  const w=$("vword"), sub=$("vsub");
+  if(!rd){
+    w.textContent="WARMING"; w.className="vword skip";
+    sub.textContent="collecting candles ("+candles.length+"/30) and building the return pool…";
+    return;
+  }
+  const live=rd, shown=lock&&lock.key===(windowStart&&windowStart.getTime())?lock:null;
+  const useDir = shown?shown.dir:live.dir;
+  const useP   = shown?shown.p:live.p;
+  const useTier= shown?shown.tier:live.tier;
+
+  $("vtag").textContent = shown?(shown.manual?"Locked · manual":"Locked call"):"Live read";
+  $("vage").textContent = shown?("@ "+short(shown.price)+(shown.flips?" · flip "+shown.flips:"")):"unlocked";
+
+  w.textContent = useDir===1?"YES":useDir===-1?"NO":"SKIP";
+  w.className   = "vword "+(useDir===1?"yes":useDir===-1?"no":"skip");
+
+  const distNow = strike!=null?price-strike:0;
+  const spotClause = "Spot "+(distNow>=0?"+":"−")+money(distNow)+" "+(distNow>=0?"above":"below")+" "+
+                     short(strike)+", "+mss(live.remain)+" left.";
+  if(useDir===0){
+    sub.textContent = live.reason+" — "+pct(live.pYes,1)+" close-above. "+spotClause+
+                      " Push the risk dial up to close the band.";
+  }else if(shown){
+    // the headline number is the LOCKED probability; show where the live model
+    // has moved since, so a position going bad is visible instead of frozen
+    const nowP = shown.dir===1?live.pYes:1-live.pYes;
+    const d=(nowP-shown.p)*100;
+    sub.textContent = "Locked "+(shown.dir===1?"YES":"NO")+" at "+pct(shown.p,1)+
+      " · live model now "+pct(nowP,1)+" ("+(d>=0?"+":"−")+Math.abs(d).toFixed(1)+" pts "+
+      (d>=0?"for you":"against you")+"). "+spotClause;
+  }else{
+    sub.textContent = "Closes "+(useDir===1?"above":"below")+" the strike in "+pct(useP,1)+" of "+
+      MC_PATHS.toLocaleString()+" simulated paths. "+spotClause;
+  }
+
+  $("pprob").textContent = pct(useP,1);
+  $("pprobl").textContent = useDir===0?"close-above":(useDir===1?"P(close ≥ strike)":"P(close < strike)");
+  $("pprob").style.color = useDir===1?"var(--yes)":useDir===-1?"var(--no)":"var(--txt)";
+
+  const conv=shown?Math.abs(shown.pYes-0.5)*2:live.conv;
+  $("convFill").style.width=(clamp(conv,0,1)*100).toFixed(1)+"%";
+  $("convFill").style.background=useDir===1?"var(--yes)":useDir===-1?"var(--no)":"var(--dim2)";
+  $("convTxt").textContent=(conv*50).toFixed(2)+" pts off 50/50 · band ±"+(live.band*100).toFixed(2);
+
+  const names=["—","PROBE","HALF","FULL"];
+  $("kSize").textContent=useDir===0?"—":names[useTier];
+  $("kSize").style.color=useDir===0?"var(--dim2)":useTier===3?"var(--yes)":"var(--txt)";
+  $("kSizeN").textContent=useDir===0?"no position":live.fights?"flow is fighting it":useTier===3?"full send":useTier===2?"half clip":"small probe";
+
+  /* Edge and Kelly are priced off the LIVE probability of the side actually
+     being held, not the probability it was locked at. The question they answer
+     is "is this position still worth holding right now", which a frozen number
+     cannot. */
+  const liveOnHeld = useDir===0?live.pYes:(useDir===1?live.pYes:1-live.pYes);
+  const heldCost = costFor(useDir);
+  const heldEdge = (useDir!==0&&heldCost!=null&&heldCost>0&&heldCost<1)?liveOnHeld-heldCost:null;
+  const heldKelly = heldEdge!=null?clamp(heldEdge/(1-heldCost),0,1):null;
+
+  if(heldEdge!=null){
+    $("kEdge").textContent=(heldEdge>=0?"+":"−")+Math.abs(heldEdge*100).toFixed(1)+"¢";
+    $("kEdge").style.color=heldEdge>=0?"var(--yes)":"var(--no)";
+    $("kEdgeN").textContent="live "+pct(liveOnHeld,0)+" vs "+(heldCost*100).toFixed(0)+"¢";
+  }else{$("kEdge").textContent="—";$("kEdge").style.color="var(--txt)";$("kEdgeN").textContent="enter contract ¢";}
+
+  if(heldKelly!=null){
+    // half-Kelly, hard-capped at 25% of bankroll — full Kelly on a model-derived
+    // probability is a ruin machine, and this is the one number that can ruin you
+    const raw=heldKelly*50, cap=Math.min(raw,25);
+    $("kKelly").textContent=cap.toFixed(1)+"%";
+    $("kKelly").style.color=cap>0?"var(--txt)":"var(--dim2)";
+    $("kKellyN").textContent=raw>25?"capped · raw "+raw.toFixed(0)+"%":"½-kelly of bankroll";
+  }else{$("kKelly").textContent="—";$("kKellyN").textContent="needs ¢";}
+
+  renderLiveStrip(live,shown);
+
+  // the risky, actually-useful callout: model vs market disagreement
+  const co=$("callout");
+  if(live.mktP!=null&&live.dir!==0&&live.edge!=null&&live.edge>=0.06){
+    co.className="callout on";
+    co.innerHTML="<b>MISPRICE.</b> Market prices "+(live.dir===1?"YES":"NO")+" at "+(live.cost*100).toFixed(0)+
+      "¢, model says "+pct(live.p,0)+". That is "+(live.edge*100).toFixed(1)+
+      " points of edge — the biggest available size the record supports.";
+  }else if(live.dir!==0&&live.fights){
+    co.className="callout on";
+    co.innerHTML="<b>FLOW FIGHTS THIS.</b> Tape and order book both lean against the call. The read stands, the size comes down.";
+  }else if(live.mc&&live.mc.touch>0.55&&Math.abs(live.pYes-0.5)>0.15){
+    co.className="callout on";
+    co.innerHTML="<b>CHOP WARNING.</b> "+pct(live.mc.touch,0)+" of paths cross the strike before the close. Directionally clear, path is not.";
+  }else co.className="callout";
+}
+
+/* The strip that answers "has anything changed since I locked this?" without a
+   refresh. It updates every tick regardless of what the headline is frozen at,
+   and it flashes the moment the live model crosses to the other side. */
+function renderLiveStrip(live,shown){
+  const ls=$("liveStrip");
+  $("liveCall").textContent = live.dir===1?"YES":live.dir===-1?"NO":"SKIP";
+  $("liveCall").style.color = live.dir===1?"var(--yes)":live.dir===-1?"var(--no)":"var(--dim2)";
+
+  /* "Now" is always quoted on the side actually being held, so it sits next to
+     "since lock" in the same units. Quoting P(close ≥ strike) here while the
+     delta was measured on a NO position made two correct numbers look like a
+     contradiction. */
+  const held = shown&&shown.dir!==0 ? shown.dir : live.dir;
+  const nowP = held===0 ? live.pYes : (held===1?live.pYes:1-live.pYes);
+  $("liveP").textContent = pct(nowP,1);
+  $("liveP").style.color = nowP>=0.5?"var(--yes)":"var(--no)";
+  $("liveKey").textContent =
+    shown&&shown.dir!==0 ? "Now on "+(shown.dir===1?"YES":"NO") : "Close ≥ strike";
+
+  const d=$("liveD"), f=$("liveFlip");
+  if(shown&&shown.dir!==0){
+    const delta=(nowP-shown.p)*100;
+    d.textContent=(delta>=0?"+":"−")+Math.abs(delta).toFixed(1)+" pts";
+    d.style.color = delta>=0?"var(--yes)":"var(--no)";
+
+    const flips=shown.flips||0, against=nowP<0.5;
+    const cool=Math.max(0,MIN_FLIP_GAP-(Date.now()-(shown.lastFlip||shown.at||0)));
+    if(!autoFlip){ f.textContent="auto-flip off — switch sides manually if you disagree"; f.className="lsD"; }
+    else if(live.remain<=FLIP_DEADLINE){ f.textContent="too late to auto-flip · "+mss(live.remain)+" left"; f.className="lsD"; }
+    else if(flips>=FLIP_BUDGET){ f.textContent="flip budget spent ("+flips+"/"+FLIP_BUDGET+") — manual switch only"; f.className="lsD"; }
+    else if(cool>0){ f.textContent="cooling off after a flip · "+mss(cool)+" before it can turn again"; f.className="lsD"; }
+    else if(against){ f.textContent="model has crossed against this call — flip armed"; f.className="lsD warn"; }
+    else { f.textContent="holding · auto-flip armed ("+flips+"/"+FLIP_BUDGET+" used)"; f.className="lsD armed"; }
+
+    if(lastAgainst!==null&&against!==lastAgainst){
+      ls.classList.remove("alert"); void ls.offsetWidth; ls.classList.add("alert");
+      log(against?"live model crossed AGAINST the locked "+(shown.dir===1?"YES":"NO")+" · "+pct(nowP,1)
+                 :"live model came back onside · "+pct(nowP,1), against?"r":"g");
+    }
+    lastAgainst=against;
+  }else{
+    d.textContent="—"; d.style.color="var(--dim2)";
+    f.textContent = shown?"sat this window out — switch sides to take a position"
+                         :"not locked yet · locks automatically at 0:40";
+    f.className="lsD";
+    lastAgainst=null;
+  }
+}
+
+function renderEvidence(rd){
+  if(!rd){$("evList").innerHTML="";return;}
+  const byKey={}; rd.fx.meta.forEach(m=>byKey[m.key]=m);
+  const bar=(v,cls)=>'<div class="eb"><i class="'+(v>=0?"pos":"neg")+(cls||"")+
+    '" style="'+(v>=0?"left:50%":"right:50%")+';width:'+(Math.abs(v)*50).toFixed(1)+'%"></i></div>';
+
+  let html="";
+  BLOCKS.forEach(b=>{
+    const bv=rd.fx.B[b.k]||0, n=rd.fx.B[b.k+"_n"]||0;
+    const w=model.w[b.k]||0;
+    // block header: the aggregate the model actually weighs, plus its learned weight
+    html+='<div class="evr evb">'+
+      '<div class="en">'+b.label+'</div>'+
+      bar(bv," big")+
+      '<div class="ev2">'+(bv>=0?"+":"")+bv.toFixed(2)+'</div>'+
+      '<div class="en2">'+(n?n+"/"+b.feats.length+" live":"no data")+
+        (model.n>=FIT_BLOCKS?' · w '+(w>=0?"+":"")+w.toFixed(2):'')+'</div></div>';
+    b.feats.forEach(k=>{
+      const m=byKey[k]; if(!m)return;
+      html+='<div class="evr evf'+(m.on?"":" off")+'">'+
+        '<div class="en">'+m.label+'</div>'+bar(m.v)+
+        '<div class="ev2">'+m.shown+'</div>'+
+        '<div class="en2">'+m.note+'</div></div>';
+    });
+  });
+  $("evList").innerHTML=html;
+
+  const live=rd.fx.meta.filter(m=>m.on);
+  const agree=live.filter(m=>Math.abs(m.v)>0.1&&(m.v>0)===(rd.pYes>=0.5)).length;
+  const dis=live.filter(m=>Math.abs(m.v)>0.1&&(m.v>0)!==(rd.pYes>=0.5)).length;
+  $("evMeta").textContent=agree+" for · "+dis+" against · "+(live.length-agree-dis)+" flat · "+
+    (rd.fx.meta.length-live.length)+" dark";
+}
+
+function renderLockBox(rd){
+  const el=$("lockBox");
+  if(!lock||!windowStart||lock.key!==windowStart.getTime()){
+    $("lockMeta").textContent = rd?("locks at 0:40"):"—";
+    el.innerHTML='<div class="evr"><div class="en" style="color:var(--dim2)">nothing locked this window</div><div></div><div></div><div></div></div>';
+    return;
+  }
+  $("lockMeta").textContent=hhmm(new Date(lock.at))+(lock.manual?" · manual":"")+(lock.flips?" · "+lock.flips+" flip":"");
+  const dist=price-lock.strike;
+  const onSide=(dist>=0?1:-1)===lock.dir;
+  const rows=[
+    ["Call",lock.dir===1?"YES":lock.dir===-1?"NO":"SKIP",lock.dir===0?"sat out":"locked at "+pct(lock.p,1)],
+    ["Strike",short(lock.strike),strikeAuto?"auto · window open":"your Kalshi strike"],
+    ["Entry",short(lock.price),"spot when locked"],
+    ["Now",(dist>=0?"+":"−")+money(dist),lock.dir===0?"—":(onSide?"on the right side":"needs to cross back")],
+    ["Size",["—","PROBE","HALF","FULL"][lock.dir===0?0:lock.tier],lock.cost!=null?"paid "+(lock.cost*100).toFixed(0)+"¢":"no fill price"]
+  ];
+  el.innerHTML=rows.map(r=>'<div class="evr" style="grid-template-columns:96px 1fr 132px">'+
+    '<div class="en" style="color:var(--dim2)">'+r[0]+'</div>'+
+    '<div class="ev2" style="text-align:left'+(r[0]==="Now"?(onSide?";color:var(--yes)":";color:var(--no)"):"")+'">'+r[1]+'</div>'+
+    '<div class="en2">'+r[2]+'</div></div>').join("");
+}
+
+/* Next window: simulate a fresh 15-minute window starting from where this one
+   is projected to close, with momentum carried over at the 15-minute cap. The
+   honest answer is usually "near a coin flip" — which is exactly why it is
+   worth showing before you size up on the next bell. */
+let nextMC=null,nextAt=0;
+function renderNext(rd){
+  if(!windowStart)return;
+  const openT=windowStart.getTime()+WIN_MS;
+  $("nwTime").textContent=hhmm(new Date(openT));
+  if(!rd||!rd.mc){$("nwDir").textContent="—";$("nwP").textContent="—";return;}
+  const base=rd.mc.q50;
+  $("nwOpen").textContent="~"+short(base)+" open";
+  if(Date.now()-nextAt>5000){
+    nextAt=Date.now();
+    const cap15=rd.sd>0?0.35*rd.sd/Math.sqrt(15):0, keep=mcMs;
+    nextMC=runMC(base,base,WIN_MS,clamp(rd.drift,-cap15,cap15));
+    mcMs=keep;                              // the rail reports the live read, not this preview
+  }
+  if(!nextMC){$("nwDir").textContent="—";return;}
+  const up=nextMC.p;
+  $("nwDir").textContent=up>=0.53?"UP":up<=0.47?"DOWN":"FLAT";
+  $("nwDir").style.color=up>=0.53?"var(--yes)":up<=0.47?"var(--no)":"var(--dim2)";
+  $("nwP").textContent=pct(up,1);
+  $("nwRange").textContent=short(nextMC.q25)+" – "+short(nextMC.q75);
+  $("nextMeta").textContent="momentum only · no strike yet";
+}
+
+function renderHist(){
+  const el=$("histList"); if(!el)return;
+  const cs=(record.calls||[]).slice(-8).reverse();
+  if(!cs.length){
+    el.innerHTML='<div class="evr"><div class="en" style="color:var(--dim2)">nothing has settled yet</div><div></div><div></div><div></div></div>';
+    $("histMeta").textContent="—"; return;
+  }
+  el.innerHTML=cs.map(c=>{
+    const col=c.dir===0?"var(--dim2)":(c.hit?"var(--yes)":"var(--no)");
+    return '<div class="evr" style="grid-template-columns:50px 44px 1fr 118px">'+
+      '<div class="en" style="color:var(--dim2);font-family:var(--mono);font-size:10.5px">'+c.t+'</div>'+
+      '<div class="ev2" style="text-align:left;color:'+col+'">'+(c.dir===1?"YES":c.dir===-1?"NO":"—")+'</div>'+
+      '<div class="ev2" style="text-align:left;color:'+col+'">'+
+        (c.dir===0?"sat out":(c.hit?"win":"loss"))+' · '+c.p+'</div>'+
+      '<div class="en2">'+c.k+' → '+c.s+'</div></div>';
+  }).join("");
+  const n=(record.calls||[]).length;
+  $("histMeta").textContent="last "+cs.length+" of "+n;
+}
+
+function renderStream(){
+  const el=$("stream"); if(!el)return;
+  el.innerHTML=stream.slice(-15).map(l=>
+    '<div class="sl '+l.c+'"><span class="st">'+l.t.toLocaleTimeString([], {hour12:false})+'</span><span class="sx">'+l.x+'</span></div>').join("");
+  $("streamMeta").textContent="trained on "+model.n+" · mc×"+model.a.toFixed(2)+" · sharp ×"+model.s.toFixed(2);
+}
+
+function renderRecord(){
+  const dec=record.w+record.l;
+  $("rWL").textContent=record.w+"–"+record.l;
+  $("rWLn").textContent=dec?(dec+" decided · "+record.skips+" skipped"):"no graded calls";
+  $("rWR").textContent=dec?pct(record.w/dec,1):"—";
+  $("rWR").style.color=dec?(record.w/dec>=0.5?"var(--yes)":"var(--no)"):"var(--txt)";
+  $("rSt").textContent=(record.streak>0?"+":"")+record.streak;
+  $("rSt").style.color=record.streak>0?"var(--yes)":record.streak<0?"var(--no)":"var(--txt)";
+  $("rStn").textContent="best +"+record.best+" · worst "+record.worst;
+  const tot=dec+record.skips;
+  $("rSk").textContent=tot?pct(record.skips/tot,0):"—";
+  $("rSk").style.color=tot&&record.skips/tot>0.35?"var(--warn)":"var(--txt)";
+  $("rBr").textContent=record.bn?(record.bsum/record.bn).toFixed(3):"—";
+  $("rTr").textContent=model.n;
+  $("rTrn").textContent=model.n<FIT_SCALARS?"needs "+FIT_SCALARS+" to fit":
+                        model.n<FIT_BLOCKS?"blocks at "+FIT_BLOCKS:"full fit";
+  $("rDots").innerHTML=record.hist.slice(-24).map(h=>'<i class="'+h+'"></i>').join("");
+}
+
+/* ---------------- chart ---------------- */
+function renderChart(rd){
+  const cv=$("chart"); if(!cv)return;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  if(!W||!H)return;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const x=cv.getContext("2d"); x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,W,H);
+  if(!windowStart||!candles.length)return;
+
+  const now=Date.now(), wS=windowStart.getTime(), wE=wS+WIN_MS;
+  const t0=wS-40*60000, t1=wE;
+  const vis=candles.filter(c=>c.t>=t0);
+  if(vis.length<2)return;
+
+  const PL=8,PR=104,PT=18,PB=20;
+  const px=t=>PL+(t-t0)/(t1-t0)*(W-PL-PR);
+
+  let lo=Infinity,hi=-Infinity;
+  vis.forEach(c=>{lo=Math.min(lo,c.l);hi=Math.max(hi,c.h);});
+  if(price!=null){lo=Math.min(lo,price);hi=Math.max(hi,price);}
+  if(strike!=null){lo=Math.min(lo,strike);hi=Math.max(hi,strike);}
+  if(rd&&rd.mc){lo=Math.min(lo,rd.mc.q10);hi=Math.max(hi,rd.mc.q90);}
+  const pad=(hi-lo)*0.10||10; lo-=pad; hi+=pad;
+  const py=v=>PT+(hi-v)/(hi-lo)*(H-PT-PB);
+
+  // current-window shading
+  x.fillStyle="rgba(255,255,255,.022)";
+  x.fillRect(px(wS),PT,px(wE)-px(wS),H-PT-PB);
+  // boundaries
+  x.strokeStyle="#2a2a32"; x.lineWidth=1;
+  [wS,wE].forEach(t=>{x.beginPath();x.moveTo(Math.round(px(t))+.5,PT);x.lineTo(Math.round(px(t))+.5,H-PB);x.stroke();});
+
+  // Monte Carlo cone (diffusive sqrt-time interpolation to the terminal quantiles)
+  if(rd&&rd.mc&&price!=null&&now<wE){
+    const T=wE-now;
+    const band=(qHi,qLo,alpha)=>{
+      x.beginPath();
+      for(let i=0;i<=30;i++){const f=i/30,t=now+T*f;x.lineTo(px(t),py(price+(qHi-price)*Math.sqrt(f)));}
+      for(let i=30;i>=0;i--){const f=i/30,t=now+T*f;x.lineTo(px(t),py(price+(qLo-price)*Math.sqrt(f)));}
+      x.closePath(); x.fillStyle=alpha; x.fill();
+    };
+    band(rd.mc.q90,rd.mc.q10,"rgba(120,140,200,.10)");
+    band(rd.mc.q75,rd.mc.q25,"rgba(120,140,200,.13)");
+    x.setLineDash([3,4]); x.strokeStyle="rgba(180,190,220,.42)"; x.lineWidth=1;
+    x.beginPath();
+    for(let i=0;i<=30;i++){const f=i/30,t=now+T*f;x.lineTo(px(t),py(price+(rd.mc.q50-price)*Math.sqrt(f)));}
+    x.stroke(); x.setLineDash([]);
+  }
+
+  // labels share a narrow gutter — nudge them apart so neither is unreadable
+  const yK = strike!=null?py(strike):null;
+  const yP = price!=null?py(price):null;
+  let lK=yK, lP=yP;
+  if(yK!=null&&yP!=null&&Math.abs(yK-yP)<26){
+    if(yK>=yP){lK=yP+26;} else {lK=yP-26;}
+    lK=clamp(lK,PT+10,H-PB-4);
+  }
+
+  // strike
+  if(strike!=null){
+    x.setLineDash([5,4]); x.strokeStyle=rd&&rd.pYes>=0.5?"rgba(18,209,142,.55)":"rgba(255,77,94,.55)"; x.lineWidth=1;
+    x.beginPath(); x.moveTo(PL,yK); x.lineTo(W-PR,yK); x.stroke(); x.setLineDash([]);
+    if(Math.abs(lK-yK)>1){                       // leader tick back to the real level
+      x.strokeStyle="rgba(140,140,150,.45)";
+      x.beginPath(); x.moveTo(W-PR,yK); x.lineTo(W-PR+5,lK); x.stroke();
+    }
+    x.fillStyle=rd&&rd.pYes>=0.5?"#12d18e":"#ff4d5e";
+    x.textAlign="left";
+    x.font="700 8px -apple-system,Helvetica,sans-serif";
+    x.fillText("STRIKE",W-PR+8,lK-4);
+    x.font="600 11px ui-monospace,Menlo,monospace";
+    x.fillText(short(strike).replace("$",""),W-PR+8,lK+9);
+  }
+
+  // price line
+  x.beginPath(); x.strokeStyle="#ecedf0"; x.lineWidth=1.5; x.lineJoin="round";
+  vis.forEach((c,i)=>{const X=px(c.t),Y=py(c.c); i?x.lineTo(X,Y):x.moveTo(X,Y);});
+  if(price!=null)x.lineTo(px(now),py(price));
+  x.stroke();
+
+  // current price marker
+  if(price!=null){
+    x.beginPath(); x.arc(px(now),lP,3,0,7); x.fillStyle="#ecedf0"; x.fill();
+    x.textAlign="left";
+    x.fillStyle="#5c5d67"; x.font="700 8px -apple-system,Helvetica,sans-serif";
+    x.fillText("SPOT",W-PR+8,lP-4);
+    x.fillStyle="#ecedf0"; x.font="600 11px ui-monospace,Menlo,monospace";
+    x.fillText(short(price).replace("$",""),W-PR+8,lP+9);
+  }
+
+  // axis ticks
+  x.fillStyle="#5c5d67"; x.font="9px ui-monospace,Menlo,monospace"; x.textAlign="center";
+  for(let t=wS-30*60000;t<=wE;t+=15*60000){ if(t<t0)continue;
+    x.fillText(hhmm(new Date(t)),px(t),H-6); }
+
+  $("chartMeta").textContent = rd&&rd.mc
+    ? "pool "+rd.mc.poolN+"m / "+rd.mc.recN+"m recent · P10 "+short(rd.mc.q10)+" · P50 "+short(rd.mc.q50)+" · P90 "+short(rd.mc.q90)
+    : "—";
+}
+
+/* ---------------- window stats + wire ---------------- */
+function renderWStats(rd){
+  $("wOpen").textContent = windowOpen!=null?short(windowOpen):"—";
+  $("wHL").textContent   = (winHi!=null&&winLo!=null)?(short(winHi)+" · "+short(winLo)):"—";
+  $("wSig").textContent  = rd&&rd.mc?money(rd.mc.sigMin):"—";
+  if(rd&&rd.mc){
+    $("wTouch").textContent=pct(rd.mc.touch,0);
+    $("wTouch").style.color=rd.mc.touch>0.55?"var(--warn)":"var(--txt)";
+  }else $("wTouch").textContent="—";
+  if(rd){
+    const dpm=(Math.exp(rd.drift)-1)*price;
+    $("wDrift").textContent=(dpm>=0?"+":"−")+money(dpm);
+    $("wDrift").style.color=Math.abs(rd.drift)>=rd.driftCap*0.98?"var(--warn)":"var(--txt)";
+
+    const ve=rd.fx.vol.exp;
+    $("wVol").textContent=ve.toFixed(2)+"×";
+    $("wVol").style.color=ve>1.5?"var(--warn)":ve<0.7?"var(--info)":"var(--txt)";
+
+    const pr=rd.fx.persist;
+    $("wPers").textContent=(pr>=0?"+":"−")+Math.abs(pr).toFixed(2);
+    $("wPers").style.color=pr>0.12?"var(--yes)":pr<-0.12?"var(--no)":"var(--txt)";
+
+    // widening spread = liquidity backing away, which matters near the close
+    $("wSpread").textContent=rd.fx.spread==null?"—":"$"+rd.fx.spread.toFixed(2);
+    $("wSpread").style.color=(rd.fx.spread!=null&&rd.fx.spread>0.5)?"var(--warn)":"var(--txt)";
+  }else{["wDrift","wVol","wPers","wSpread"].forEach(i=>$(i).textContent="—");}
+}
+function renderWire(){
+  const el=$("wireList"); if(!el)return;
+  if(!news||!news.items||!news.items.length){
+    el.innerHTML='<div class="w"><i></i><div class="h" style="color:var(--dim2)">pulling headlines…</div><div class="a"></div></div>';
+    return;
+  }
+  el.innerHTML=news.items.slice(0,4).map(it=>{
+    const age=Math.max(0,Math.round((Date.now()-it.at)/60000));
+    const c=it.s>0?"p":it.s<0?"n":"";
+    return '<div class="w"><i class="'+c+'"></i><div class="h">'+
+      it.title.replace(/[<>]/g,"")+'</div><div class="a">'+(age<60?age+"m":Math.round(age/60)+"h")+'</div></div>';
+  }).join("");
+  $("wireMeta").textContent="tone "+(news.score>=0?"+":"")+news.score.toFixed(2)+" · "+news.fresh+" fresh";
+}
+
+/* ============================================================
+   LOOP
+   ============================================================ */
+async function poll(){
+  let p=null;
+  if(wsPrice!=null&&Date.now()-lastWsTick<8000){p=wsPrice;setFeed(true,"coinbase ws");}
+  else{p=await fetchSpot(); setFeed(p!=null,p!=null?"coinbase rest":null);}
+  if(p!=null)onTick(p,Date.now());
+}
+
+let lastMC=0,lastNarr=0,narrN=0,lastDir=null;
+function narrate(rd,now){
+  narrN++;
+  const lines=[
+    ()=>"mc "+MC_PATHS.toLocaleString()+" paths in "+mcMs.toFixed(1)+"ms · σ "+money(rd.mc.sigMin)+
+        "/min · "+mss(rd.remain)+" to close",
+    ()=>"p(close ≥ "+short(strike).replace("$","")+") raw "+pct(rd.mc.p,1)+" → learned "+pct(rd.pRaw,1)+
+        " → calibrated "+pct(rd.pYes,1),
+    ()=>{const top=rd.fx.meta.filter(m=>m.on).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,3)
+          .map(m=>m.label.split(" ")[0].toLowerCase()+" "+(m.v>=0?"+":"")+m.v.toFixed(2)).join(" · ");
+         return "loudest signals: "+(top||"none live yet");},
+    ()=>"blocks: "+BLOCKS.map(b=>b.label.split(" ")[0].toLowerCase()+" "+
+          ((rd.fx.B[b.k]||0)>=0?"+":"")+(rd.fx.B[b.k]||0).toFixed(2)).join(" · "),
+    ()=>"vol regime "+rd.fx.vol.exp.toFixed(2)+"× · bootstrap leaning "+
+        pct(rd.mc.recW!=null?rd.mc.recW:0.7,0)+" recent · persistence "+
+        (rd.fx.persist>=0?"+":"")+rd.fx.persist.toFixed(2)+
+        (rd.fx.persist<-0.1?" (fading its own moves — momentum squeezed)":
+         rd.fx.persist>0.1?" (following through — momentum earns room)":" (neutral)"),
+    ()=>"cone P10 "+short(rd.mc.q10)+" · P50 "+short(rd.mc.q50)+" · P90 "+short(rd.mc.q90)+
+        " · "+pct(rd.mc.touch,0)+" of paths cross the strike",
+    ()=>{const d=(Math.exp(rd.drift)-1)*price;
+         return "drift "+(d>=0?"+":"−")+money(d)+"/min vs σ "+money(rd.sd*price)+
+                " · "+(Math.abs(rd.drift)/(rd.driftCap||1e-9)*100).toFixed(0)+
+                "% of the cap for "+mss(rd.remain)+" remaining";},
+    ()=>rd.sb.obs!=null
+        ? "skip control: "+pct(rd.sb.obs,0)+" observed vs "+pct(rd.sb.target,0)+" target → band ×"+rd.sb.tight.toFixed(2)
+        : "skip band ±"+(rd.band*100).toFixed(2)+" pts · "+(record.w+record.l+record.skips)+"/8 windows before the controller arms",
+    ()=>model.n>=FIT_BLOCKS
+        ? "weights live: "+BLOCKS.map(b=>[b.label.split(" ")[0].toLowerCase(),model.w[b.k]||0])
+            .sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,3)
+            .map(p=>p[0]+" "+(p[1]>=0?"+":"")+p[1].toFixed(2)).join(" · ")+" · mc×"+model.a.toFixed(2)
+        : model.n>=FIT_SCALARS
+        ? "scalars fit on "+model.n+" windows (mc×"+model.a.toFixed(2)+") · block weights locked until "+FIT_BLOCKS
+        : "pure simulation prior · "+model.n+"/"+FIT_SCALARS+" settled windows before the fit unlocks",
+    ()=>{const t=tapeRead(60000);
+         return "tape 60s: "+t.n+" prints · "+Math.round((Math.abs(t.r)+1)/2*100)+"% "+(t.r>=0?"buy":"sell")+
+                " aggression · book "+(obImb==null?"—":(obImb>=0?"+":"")+obImb.toFixed(2));}
+  ];
+  log(lines[narrN%lines.length]());
+}
+
+/* Driven by setInterval, never requestAnimationFrame. rAF is suspended
+   outright in a hidden tab, which would silently stop the model, the locks and
+   the settlement grading the moment you switched away — exactly the fifteen
+   minutes you most want it running. Intervals are throttled in the background,
+   not killed. */
+function tickModel(){
+  const now=Date.now();
+  lastMC=now;
+  const rd=computeRead(now);
+  read=rd;
+  if(rd){
+    if(!ready){ready=true;log("engine live · "+rd.mc.poolN+" one-minute returns pooled · σ "+money(rd.mc.sigMin)+"/min","hi");}
+    updateLock(rd,now);
+    renderVerdict(rd,now); renderEvidence(rd); renderLockBox(rd);
+    renderChart(rd); renderWStats(rd); renderNext(rd);
+    if(rd.dir!==lastDir&&lastDir!==null&&!lock){
+      log("live read moved to "+(rd.dir===1?"YES":rd.dir===-1?"NO":"SKIP")+" @ "+pct(rd.pYes,1),
+          rd.dir===1?"g":rd.dir===-1?"r":"y");
+    }
+    lastDir=rd.dir;
+    if(now-lastNarr>5500){lastNarr=now;narrate(rd,now);}
+  }else{
+    renderVerdict(null,now); renderChart(null); renderWStats(null);
+  }
+  renderRecord();
+}
+
+/* ---------------- inputs ---------------- */
+function num(s){const v=parseFloat(String(s).replace(/[^0-9.]/g,""));return isFinite(v)?v:null;}
+function wireInputs(){
+  const si=$("inStrike");
+  si.addEventListener("input",()=>{
+    const v=num(si.value);
+    if(si.value.trim()===""){strikeAuto=true;strike=windowOpen;$("strikeMeta").textContent="auto · window open";}
+    else if(v!=null&&v>0){
+      if(strike!==v&&lock){lock=null;saveLock();log("strike changed → lock dropped, fresh read","y");}
+      strike=v;strikeAuto=false;$("strikeMeta").textContent="kalshi strike";
+    }
+    saveCfg();
+  });
+  $("inYes").addEventListener("input",e=>{yesC=num(e.target.value);saveCfg();});
+  $("inNo").addEventListener("input",e=>{noC=num(e.target.value);saveCfg();});
+  const rr=$("inRisk");
+  const label=v=>v>=0.92?"NEVER SKIP":v>=0.72?"AGGRESSIVE":v>=0.5?"ACTIVE":v>=0.28?"MEASURED":"SELECTIVE";
+  const paintRisk=()=>{
+    const sb=skipBand();
+    $("riskVal").textContent=label(risk)+" · ±"+(sb.band*100).toFixed(2)+" pts";
+  };
+  rr.addEventListener("input",e=>{risk=+e.target.value/100;paintRisk();saveCfg();});
+  rr.value=Math.round(risk*100);
+  paintRisk();
+  setInterval(paintRisk,4000);
+  $("btnLock").addEventListener("click",()=>{forceLock=true;tickModel();});
+  $("btnSide").addEventListener("click",()=>{forceSide=true;tickModel();});
+  $("btnClear").addEventListener("click",()=>{dropLock=true;tickModel();});
+  const fb=$("btnFlip");
+  const paint=()=>{fb.textContent="Auto-flip: "+(autoFlip?"on":"off");fb.className=autoFlip?"on":"";};
+  fb.addEventListener("click",()=>{autoFlip=!autoFlip;paint();saveCfg();log("auto-flip "+(autoFlip?"enabled":"disabled"),"y");});
+  paint();
+  $("btnReset").addEventListener("click",()=>{
+    if(!confirm("Wipe the track record, the training set and the learned weights?"))return;
+    samples=[];record={w:0,l:0,skips:0,streak:0,best:0,worst:0,hist:[],calls:[],bsum:0,bn:0};
+    model={a:1,b:0,s:1,w:{},n:0};BKEYS.forEach(k=>model.w[k]=0);
+    lock=null;saveModel();saveSamples();saveRec();saveLock();
+    log("record + model wiped — starting from the prior","y");renderRecord();renderHist();
+  });
+  if(!strikeAuto&&strike!=null)si.value=String(strike);
+  if(yesC!=null)$("inYes").value=String(yesC);
+  if(noC!=null)$("inNo").value=String(noC);
+  $("strikeMeta").textContent=strikeAuto?"auto · window open":"kalshi strike";
+}
+
+/* ---------------- boot ---------------- */
+(async function boot(){
+  loadAll(); wireInputs(); renderRecord(); renderStream(); renderWire(); renderWStats(null); renderHist();
+  log("boot · "+(samples.length?samples.length+" stored windows in the training set":"cold start, no history yet"),"hi");
+  if(pendingSchemaNote!=null)
+    log("signal set changed (v"+pendingSchemaNote+"→v"+SCHEMA+") · training set reset, W/L record kept","y");
+  log(FEATS.length+" signals across "+BLOCKS.length+" blocks · "+
+      BLOCKS.map(b=>b.label.split(" ")[0].toLowerCase()).join(" · "),"b");
+  startWS();
+  await fetchCandles();
+  log("candles "+candles.length+" × 1m loaded","b");
+  const sp=await fetchSpot();
+  if(sp!=null)onTick(sp,Date.now());
+  train();
+  fetchBook(); fetchFng(); fetchNews(); fetchMood();
+  setInterval(poll,1000);
+  setInterval(fetchCandles,45000);
+  setInterval(fetchBook,10000);
+  setInterval(fetchNews,120000);
+  setInterval(fetchFng,600000);
+  setInterval(fetchMood,300000);
+  setInterval(()=>renderRail(Date.now()),250);
+  setInterval(tickModel,1400);
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden){renderRail(Date.now());tickModel();}   // repaint instantly on return
+  });
+  window.addEventListener("resize",()=>renderChart(read));
+  tickModel();
+})();
+
+/* Registered only over https, so the same file still runs from file:// on the Mac. */
+if(location.protocol==="https:"&&"serviceWorker"in navigator){
+  window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});
+}
+</script>
+</body>
+</html>

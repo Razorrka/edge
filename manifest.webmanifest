@@ -1,0 +1,23 @@
+{
+ "name": "EDGE \u00b7 BTC 15-min",
+ "short_name": "EDGE",
+ "description": "Monte-Carlo settlement model for Kalshi 15-minute BTC windows",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "background_color": "#08080a",
+ "theme_color": "#08080a",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any maskable"
+  }
+ ]
+}
