@@ -78,6 +78,16 @@ body{min-height:100vh;font-size:14px}
 .kpi .k{font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase}
 .kpi .v{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:5px;font-variant-numeric:tabular-nums}
 .kpi .n{font-size:10px;color:var(--dim2);margin-top:2px}
+/* the desk read */
+.desk{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.desk-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.desk-l{font-size:10px;letter-spacing:.17em;color:var(--dim2);text-transform:uppercase;font-weight:700}
+.desk-s{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;padding:3px 8px;border:1px solid var(--line2);color:var(--dim)}
+.desk-s.hard{border-color:var(--warn);color:var(--warn)}
+.desk-b{font-size:13px;line-height:1.62;color:var(--txt)}
+.desk-b b{color:var(--yes)} .desk-b i{color:var(--no);font-style:normal}
+.desk-b s{color:var(--dim);text-decoration:none}
+
 /* live-vs-locked strip */
 .livestrip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--line);margin-top:18px;border-top:1px solid var(--line)}
 .livestrip>div{background:var(--surf);padding:9px 12px;display:flex;flex-direction:column;gap:4px}
@@ -345,6 +355,14 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
         </div>
 
         <div class="callout" id="callout"></div>
+
+        <div class="desk">
+          <div class="desk-h">
+            <span class="desk-l">The read</span>
+            <span class="desk-s" id="deskState">—</span>
+          </div>
+          <div class="desk-b" id="deskTxt">watching.</div>
+        </div>
       </div>
 
       <div class="sec">
@@ -449,19 +467,31 @@ const BLOCK    = 3;                 // bootstrap block length (minutes)
    members, and the logistic layer weighs the five blocks. Fitting 20 weights
    would need hundreds of settled windows before it meant anything; five needs
    a couple of dozen. The evidence table still shows all twenty individually. */
+/* `horizon` is how far ahead a block actually forecasts, and it decides how
+   much the block is worth as the clock runs down. A ten-minute trend says
+   almost nothing about the next twenty seconds; the tape says almost
+   everything, because one aggressive sweep settles it. Weighting these two the
+   same at 14:00 and at 0:20 — which is what a single fitted weight does — is
+   simply wrong, so the time profile is structural rather than learned. */
 const BLOCKS = [
-  {k:"bTrend", label:"Trend",      feats:["trend","macd","legs","mtf","vwap"]},
-  {k:"bMomo",  label:"Momentum",   feats:["roc","rsi","bb","range"]},
-  {k:"bFlow",  label:"Order flow", feats:["tape","accel","book","whale","accept","pressure"]},
-  {k:"bStruct",label:"Structure",  feats:["regime","volume","wick"]},
-  {k:"bCtx",   label:"Context",    feats:["news","mood"]}
+  {k:"bTrend", label:"Trend",      horizon:"slow", feats:["trend","macd","legs","mtf","vwap"]},
+  {k:"bMomo",  label:"Momentum",   horizon:"mid",  feats:["roc","rsi","bb","range"]},
+  {k:"bFlow",  label:"Order flow", horizon:"fast", feats:["tape","accel","book","whale","accept","pressure"]},
+  {k:"bStruct",label:"Structure",  horizon:"slow", feats:["regime","volume","wick"]},
+  {k:"bCtx",   label:"Context",    horizon:"slow", feats:["news","mood"]}
 ];
+/* tau = fraction of the window still to run (1 at the open, 0 at the bell). */
+function horizonMult(h,tau){
+  if(h==="fast")return 1.35-0.35*tau;     // matters MORE into the close
+  if(h==="mid") return 0.60+0.40*tau;
+  return 0.35+0.65*tau;                   // slow signals decay toward the bell
+}
 const BKEYS = BLOCKS.map(b=>b.k);
 const FEATS = BLOCKS.reduce((a,b)=>a.concat(b.feats),[]);
 /* Training samples store block values, not raw features. Bump this whenever
    that shape changes so stale samples are dropped instead of silently
    contributing zeros to every block they predate. */
-const SCHEMA = 2;
+const SCHEMA = 3;
 
 const $ = id => document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -779,8 +809,14 @@ function applyGrade(g,settlePx,strikeUsed){
                      hit,auto:!!g.autoStrike,
                      at:g.at||g.key,px:g.px||null});   // numeric, for chart markers
   if(record.calls.length>40)record.calls=record.calls.slice(-24);
-  samples.push({zmc:g.zmc,x:g.x,y:yes?1:0,p:g.pYes,t:Date.now()});
+  samples.push({zmc:g.zmc,x:g.x,y:yes?1:0,p:g.pYes,t:Date.now(),
+                tau:g.tau,pmc:g.pmc,state:g.state,hard:!!g.hard});
   if(samples.length>400)samples=samples.slice(-300);
+  // per-state track record: which market states this model is actually good in
+  if(!record.byState)record.byState={};
+  const st=g.state||"?";
+  const bs=record.byState[st]||(record.byState[st]={w:0,l:0,s:0});
+  if(g.dir===0)bs.s++; else if(hit)bs.w++; else bs.l++;
   return {yes,hit};
 }
 
@@ -795,13 +831,18 @@ function undoLastGrade(g){
   record.bn=Math.max(0,record.bn-1);
   if(record.calls&&record.calls.length)record.calls.pop();
   if(samples.length)samples.pop();
+  const bs=record.byState&&record.byState[g.state||"?"];
+  if(bs){ if(g.dir===0)bs.s=Math.max(0,bs.s-1);
+          else if(g.hit)bs.w=Math.max(0,bs.w-1);
+          else bs.l=Math.max(0,bs.l-1); }
 }
 
 function settleWindow(key,settlePx){
   if(!lock||lock.key!==key){lock=null;saveLock();return;}
   const g={key,dir:lock.dir,p:lock.p,pYes:lock.pYes,zmc:lock.zmc,x:lock.x,
            tier:lock.tier,strike:lock.strike,autoStrike:!!lock.autoStrike,
-           at:lock.at||key,px:lock.price};
+           at:lock.at||key,px:lock.price,
+           tau:lock.tau,pmc:lock.pmc,state:lock.state,hard:!!lock.hard};
   const {yes,hit}=applyGrade(g,settlePx,lock.strike);
   g.yes=yes; g.hit=hit; g.settlePx=settlePx;
   lastSettled=g; saveLast();
@@ -842,9 +883,23 @@ function regradeLast(newStrike){
    fully saturated they can move a 50/50 to roughly 82/18 and no further. The
    Monte Carlo stays the backbone of every number on the screen. */
 const FEAT_Z_CAP=1.5;
-function featZ(B,w){
+/* Two modulations, both structural:
+   - each block is scaled by its horizon against the clock, so what the model
+     listens to genuinely changes as the window runs out;
+   - the whole tilt shrinks as the simulation gets decisive. If distance and
+     remaining volatility already put this at 97%, the signals have no business
+     arguing — they get authority near a coin flip and defer at the extremes. */
+function featZ(B,w,tau,pMC){
+  const t=tau==null?1:clamp(tau,0,1);
   let z=0;
-  for(let i=0;i<BKEYS.length;i++)z+=(w[BKEYS[i]]||0)*(B[BKEYS[i]]||0);
+  for(let i=0;i<BLOCKS.length;i++){
+    const b=BLOCKS[i];
+    z+=(w[b.k]||0)*(B[b.k]||0)*horizonMult(b.horizon,t);
+  }
+  if(pMC!=null){
+    const decisive=Math.abs(2*clamp(pMC,0,1)-1);
+    z*=1-0.70*Math.pow(decisive,3);
+  }
   return clamp(z,-FEAT_Z_CAP,FEAT_Z_CAP);
 }
 
@@ -854,6 +909,20 @@ function featZ(B,w){
    Parameters unlock only once enough windows have settled to pay for them:
    <12 nothing, 12–23 the two scalars, 24+ the five block weights. */
 const FIT_SCALARS=12, FIT_BLOCKS=24, FIT_CALIB=25;
+
+/* Not every settled window teaches the same amount. A window that was 3% away
+   from the strike was decided by arithmetic and there is no skill in it; a
+   window that sat at 50/50 in a dead tape is where the whole edge lives. So
+   samples are weighted toward the coin flips and toward the states that
+   actually hurt — standstills, peaks and chop. This is where the model spends
+   its attention. */
+function sampleWeight(s){
+  const pm=s.pmc==null?0.5:clamp(s.pmc,0,1);
+  const flip=1-Math.abs(2*pm-1);                 // 1 at 50/50, 0 at the extremes
+  let sw=0.25+1.75*Math.pow(flip,1.5);
+  if(s.hard)sw*=1.35;
+  return sw;
+}
 function train(){
   const S=samples.slice(-240), m=S.length;
   model.n=m;
@@ -865,22 +934,26 @@ function train(){
   }
   const fitB = m>=FIT_BLOCKS;
   const lr=0.06, epochs=80, l2=0.025*Math.max(1,120/m);
+  const W=S.map(sampleWeight), wsum=W.reduce((a,b)=>a+b,0)||1;
   let a=1,b=0; const w={}; BKEYS.forEach(k=>w[k]=0);
   for(let e=0;e<epochs;e++){
     let ga=0,gb=0; const gw={}; BKEYS.forEach(k=>gw[k]=0);
     for(let i=0;i<m;i++){
-      const s=S[i];
-      const zf=fitB?featZ(s.x,w):0;
-      const d=sigmoid(a*s.zmc+b+zf)-s.y;
+      const s=S[i], sw=W[i];
+      const zf=fitB?featZ(s.x,w,s.tau,s.pmc):0;
+      const d=(sigmoid(a*s.zmc+b+zf)-s.y)*sw;
       ga+=d*s.zmc; gb+=d;
       // gradient is zero through a saturated cap, which is the point
-      if(fitB&&Math.abs(zf)<FEAT_Z_CAP)
-        for(let f=0;f<BKEYS.length;f++)gw[BKEYS[f]]+=d*(s.x[BKEYS[f]]||0);
+      if(fitB&&Math.abs(zf)<FEAT_Z_CAP){
+        const t=s.tau==null?1:clamp(s.tau,0,1);
+        for(let f=0;f<BLOCKS.length;f++){const bk=BLOCKS[f];
+          gw[bk.k]+=d*(s.x[bk.k]||0)*horizonMult(bk.horizon,t);}
+      }
     }
-    a=clamp(a-lr*(ga/m+l2*(a-1)),0.40,1.80);
-    b=clamp(b-lr*(gb/m+l2*b),-0.80,0.80);
+    a=clamp(a-lr*(ga/wsum+l2*(a-1)),0.40,1.80);
+    b=clamp(b-lr*(gb/wsum+l2*b),-0.80,0.80);
     if(fitB)for(let f=0;f<BKEYS.length;f++){const k=BKEYS[f];
-      w[k]=clamp(w[k]-lr*(gw[k]/m+l2*w[k]),-0.55,0.55);}
+      w[k]=clamp(w[k]-lr*(gw[k]/wsum+l2*w[k]),-0.55,0.55);}
   }
   // calibration: 1-D sharpness search, only with enough evidence to mean anything
   let s=1;
@@ -890,8 +963,8 @@ function train(){
       let ll=0;
       for(let i=0;i<m;i++){
         const sm=S[i];
-        const p=clamp(sigmoid((a*sm.zmc+b+(fitB?featZ(sm.x,w):0))*t),1e-6,1-1e-6);
-        ll-=sm.y*Math.log(p)+(1-sm.y)*Math.log(1-p);
+        const p=clamp(sigmoid((a*sm.zmc+b+(fitB?featZ(sm.x,w,sm.tau,sm.pmc):0))*t),1e-6,1-1e-6);
+        ll-=(sm.y*Math.log(p)+(1-sm.y)*Math.log(1-p))*W[i];
       }
       if(ll<bl){bl=ll;s=t;}
     }
@@ -1171,9 +1244,52 @@ function buildFeatures(px,remainMs){
   add("mood",mv*0.5,"Market mood",fng?String(fng.v):(mood!=null?Math.round(mood)+"%":"—"),
       mp.length?mp.join(" · "):"loading", !!(fng||mood!=null));
 
-  return {F,meta,active,B:blockVals(F,active),
-          atrV,er,rsiV:r,e9,e21,e50,tape60:t60,vr,hist,vwap,
-          persist:persistence(),vol:volRegime(),spread:obSpread};
+  const out={F,meta,active,B:blockVals(F,active),
+             atrV,er,rsiV:r,e9,e21,e50,tape60:t60,vr,hist,vwap,
+             persist:persistence(),vol:volRegime(),spread:obSpread,
+             tau:clamp((remainMs||0)/WIN_MS,0,1)};
+  out.state=marketState(out,px);
+  return out;
+}
+
+/* The named market states. STANDSTILL and PEAK are the two that actually cost
+   money — a pinned market is a true coin flip dressed up as calm, and a peak
+   looks like strength right up until it isn't. Both are marked `hard`, which
+   later buys them extra weight in training. */
+function marketState(fx,px){
+  const er=fx.er, ve=fx.vol.exp, r=fx.rsiV;
+  const rng=(winHi!=null&&winLo!=null)?(winHi-winLo):null;
+  const tight=rng!=null&&fx.atrV>0&&rng<fx.atrV*0.9;
+  const quiet=fx.tape60.n<25;
+  /* Absolute quiet, not just relative. A vol RATIO cannot see a standstill —
+     when both the short and long windows are equally dead the ratio sits at
+     1.0 and the deadest tape of the day looks perfectly normal. */
+  const atrPct=px>0?fx.atrV/px:0;
+  const dead=atrPct<0.00030||ve<0.80;
+  const stretched=Math.abs(r-50)>22||Math.abs(fx.F.bb||0)>0.85;
+  const rejected=Math.abs(fx.F.wick||0)>0.5;
+  const climax=fx.vr>1.6;
+
+  /* Two routes in. Absolutely dead comes first: when bars are this small the
+     moves are meaningless whether or not they happened to line up, and an
+     efficiency ratio computed on noise will clear any threshold by chance. */
+  if(atrPct<0.00030&&(tight||quiet))
+    return {k:"STANDSTILL",hard:true,
+            note:"pinned — bars this small can't reach the strike"};
+  if(dead&&er<0.22&&(tight||quiet))
+    return {k:"STANDSTILL",hard:true,
+            note:"pinned — vol contracting with no direction, a genuine coin flip"};
+  if(stretched&&(rejected||climax)&&er<0.50)
+    return {k:"PEAK",hard:true,
+            note:"exhaustion — stretched and being rejected, turn risk both ways"};
+  if(ve>1.55&&er>0.32)
+    return {k:"BREAKOUT",hard:false,
+            note:"volatility expanding with direction behind it"};
+  if(er>0.45)
+    return {k:"TREND",hard:false,note:"clean directional follow-through"};
+  if(er<0.25)
+    return {k:"CHOP",hard:true,note:"two-way, no side holding — edge is thin"};
+  return {k:"GRIND",hard:false,note:"slow drift, nothing decisive"};
 }
 
 /* Each block averages its ACTIVE members only. */
@@ -1265,7 +1381,8 @@ function computeRead(now){
   mc=m; mcAt=Date.now();
 
   const zmc=logit(m.p);
-  const z=model.a*zmc+model.b+featZ(fx.B,model.w);   // same cap the fit was trained under
+  // identical modulation to the one the fit was trained under
+  const z=model.a*zmc+model.b+featZ(fx.B,model.w,fx.tau,m.p);
   const pRaw=sigmoid(z);
   const pYes=clamp(sigmoid(z*model.s),0.005,0.995);
 
@@ -1311,6 +1428,8 @@ function updateLock(rd,now){
   const key=windowStart.getTime(), elapsed=now-key, remain=rd.remain;
   const snap=()=>({key,dir:rd.dir,p:rd.p,pYes:rd.pYes,price,strike,at:now,tier:rd.tier,
                    zmc:rd.zmc,x:rd.fx.B,edge:rd.edge,cost:rd.cost,autoStrike:strikeAuto,
+                   tau:rd.fx.tau,pmc:rd.mc?rd.mc.p:null,
+                   state:rd.fx.state?rd.fx.state.k:null,hard:!!(rd.fx.state&&rd.fx.state.hard),
                    flips:lock&&lock.key===key?(lock.flips||0):0});
 
   if(lock&&lock.key!==key){lock=null;}
@@ -1544,6 +1663,83 @@ function renderLiveStrip(live,shown){
 /* The winning archetype out of the simulation, plus where it most likely lands.
    This is the answer to "what actually happens", as opposed to the probability
    that a single threshold is cleared. */
+/* The desk read: how someone who actually trades these would say it. Every
+   clause is bolted to a real number — the voice is in the ordering and the
+   bluntness, not in invented confidence. A good Kalshi trader's most common
+   sentence is "I don't like this one", so it has to be able to say that. */
+function traderRead(rd){
+  const m=rd.mc, st=rd.fx.state, mins=rd.remain/60000;
+  const dist=strike!=null?price-strike:0, sig=m.sigMin*Math.sqrt(Math.max(mins,1/60));
+  const sigmas=sig>0?dist/sig:0;
+  const top=m.scen[0], margin=top.p-m.scen[1].p;
+  const flow=rd.fx.tape60, fl=flow.n>=6?flow.r:0;
+  const bits=[];
+
+  // 1. where we stand, in units that matter
+  bits.push(mins<1?"Under a minute.":mins<3?mss(rd.remain)+" left — this is the business end.":
+            mins<8?mss(rd.remain)+" left.":"Early, "+mss(rd.remain)+" on the clock.");
+  bits.push("Spot is "+(dist>=0?"+":"−")+money(dist)+" "+(dist>=0?"over":"under")+" "+short(strike)+
+            ", which is "+Math.abs(sigmas).toFixed(2)+"σ of what's left to run.");
+
+  // 2. the state, named and judged
+  if(st.k==="STANDSTILL")bits.push("Market's <i>standing still</i> — "+st.note+". These are the ones that look free and aren't.");
+  else if(st.k==="PEAK")bits.push("This smells like a <i>peak</i> — "+st.note+".");
+  else if(st.k==="CHOP")bits.push("Chop. Nobody's holding a side.");
+  else if(st.k==="TREND")bits.push("Trend's clean and following through.");
+  else if(st.k==="BREAKOUT")bits.push("Vol's expanding with direction behind it.");
+  else bits.push("Slow grind, nothing decisive.");
+
+  // 3. what the sim says happens, and how sure it is about it
+  bits.push("Sim's modal outcome is <s>"+top.label.toLowerCase()+"</s> at "+pct(top.p,0)+
+            (margin<0.06?", but the runner-up is right behind it — that's not a read, that's a guess."
+                       :", clear of the next one by "+(margin*100).toFixed(0)+" points."));
+  if(m.touch>0.55&&Math.abs(m.p-0.5)>0.15)
+    bits.push(pct(m.touch,0)+" of paths cross the line before the bell — right side, ugly ride.");
+
+  // 4. flow, weighted by how much it matters at this point in the window
+  const fw=horizonMult("fast",rd.fx.tau);
+  if(Math.abs(fl)>0.12)
+    bits.push("Tape is "+Math.round((Math.abs(fl)+1)/2*100)+"% "+(fl>0?"bid":"offered")+
+              (mins<3?" and this late that's most of the story.":fw>1.15?" and it's starting to matter.":" but there's time for it to change."));
+
+  // 5. the actual call, with the money view
+  if(rd.dir===0){
+    bits.push("<i>I'm passing.</i> Inside the coin-flip band — no price makes this worth it.");
+  }else{
+    const side=rd.dir===1?"YES":"NO";
+    if(rd.edge!=null&&rd.edge>=0.06)
+      bits.push("<b>"+side+" is mispriced</b> — model "+pct(rd.p,0)+" against "+(rd.cost*100).toFixed(0)+
+                "¢. That's "+(rd.edge*100).toFixed(0)+" points of edge and the reason to size up.");
+    else if(rd.edge!=null&&rd.edge<-0.02)
+      bits.push("Model likes "+side+" at "+pct(rd.p,0)+" but you're paying "+(rd.cost*100).toFixed(0)+
+                "¢ for it. <i>That's not a trade, that's a donation.</i>");
+    else if(rd.fights)
+      bits.push("Taking "+side+" at "+pct(rd.p,0)+", but tape and book are both leaning against it — "+
+                "so it's a <s>small</s> one, not a swing.");
+    else
+      bits.push("Taking <b>"+side+"</b> at "+pct(rd.p,0)+", size "+["","probe","half","full"][rd.tier]+".");
+  }
+
+  // 6. honesty about its own record in this exact state
+  const bs=record.byState&&record.byState[st.k];
+  if(bs&&(bs.w+bs.l)>=4){
+    const wr=bs.w/(bs.w+bs.l);
+    bits.push("For what it's worth, this model is "+bs.w+"–"+bs.l+" in "+st.k+" ("+pct(wr,0)+")"+
+              (wr<0.45?" — it has not earned trust here yet.":wr>0.6?" — this is its good state.":"."));
+  }else if(model.n<FIT_SCALARS)
+    bits.push("Still on the simulation prior — "+model.n+"/"+FIT_SCALARS+" windows before it's learned anything from you.");
+
+  return bits.join(" ");
+}
+
+function renderDesk(rd){
+  if(!rd){$("deskTxt").textContent="watching.";return;}
+  $("deskTxt").innerHTML=traderRead(rd);
+  const st=rd.fx.state;
+  $("deskState").textContent=st.k;
+  $("deskState").className="desk-s"+(st.hard?" hard":"");
+}
+
 function renderScenario(rd){
   if(!rd||!rd.mc||!rd.mc.scen){$("scWord").textContent="—";$("scNote").textContent="simulating…";return;}
   const m=rd.mc, top=m.scen[0];
@@ -2005,7 +2201,8 @@ function tickModel(){
     if(!ready){ready=true;log("engine live · "+rd.mc.poolN+" one-minute returns pooled · σ "+money(rd.mc.sigMin)+"/min","hi");}
     updateLock(rd,now);
     renderVerdict(rd,now); renderEvidence(rd); renderLockBox(rd);
-    renderChart(rd); renderWStats(rd); renderNext(rd); renderStale(); renderScenario(rd);
+    renderChart(rd); renderWStats(rd); renderNext(rd); renderStale();
+    renderScenario(rd); renderDesk(rd);
     if(rd.dir!==lastDir&&lastDir!==null&&!lock){
       log("live read moved to "+(rd.dir===1?"YES":rd.dir===-1?"NO":"SKIP")+" @ "+pct(rd.pYes,1),
           rd.dir===1?"g":rd.dir===-1?"r":"y");
