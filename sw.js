@@ -2,7 +2,7 @@
    so the model always talks to Coinbase live. Network-first so a new build
    lands immediately; cache is purely the offline fallback.
    BUMP CACHE ON EVERY PUBLISH or phones keep the old build. */
-const CACHE="edge-v5";
+const CACHE="edge-v6";
 const SHELL=["./","./index.html","./manifest.webmanifest",
              "./icon-180.png","./icon-192.png","./icon-512.png"];
 self.addEventListener("install",e=>{

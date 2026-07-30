@@ -78,6 +78,16 @@ body{min-height:100vh;font-size:14px}
 .kpi .k{font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase}
 .kpi .v{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:5px;font-variant-numeric:tabular-nums}
 .kpi .n{font-size:10px;color:var(--dim2);margin-top:2px}
+/* limit-price ladder */
+.limit{margin-top:16px;border:1px solid var(--line2);background:var(--surf)}
+.limit .lim-h{font-size:9px;letter-spacing:.16em;color:var(--dim2);text-transform:uppercase;padding:9px 12px 0}
+.limit .lim-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);margin-top:8px}
+.limit .lim-c{background:var(--surf);padding:9px 12px;text-align:center}
+.limit .lim-v{font-family:var(--mono);font-size:21px;font-weight:700;line-height:1;color:var(--yes);font-variant-numeric:tabular-nums}
+.limit .lim-v.dead{color:var(--dim2)}
+.limit .lim-k{font-size:8.5px;letter-spacing:.13em;color:var(--dim2);text-transform:uppercase;margin-top:5px}
+.limit .lim-n{font-size:10.5px;color:var(--dim2);padding:8px 12px 10px;line-height:1.45}
+
 /* the desk read */
 .desk{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
 .desk-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
@@ -352,6 +362,16 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
           <div class="kpi"><div class="k">Size</div><div class="v" id="kSize">—</div><div class="n" id="kSizeN">—</div></div>
           <div class="kpi"><div class="k">Edge</div><div class="v" id="kEdge">—</div><div class="n" id="kEdgeN">enter ¢</div></div>
           <div class="kpi"><div class="k">Kelly</div><div class="v" id="kKelly">—</div><div class="n" id="kKellyN">½-kelly</div></div>
+        </div>
+
+        <div class="limit" id="limitBox">
+          <div class="lim-h">Pay up to</div>
+          <div class="lim-row">
+            <div class="lim-c"><div class="lim-v" id="limGood">—</div><div class="lim-k">good buy</div></div>
+            <div class="lim-c"><div class="lim-v" id="limThin">—</div><div class="lim-k">thin edge</div></div>
+            <div class="lim-c"><div class="lim-v dead" id="limBE">—</div><div class="lim-k">break-even</div></div>
+          </div>
+          <div class="lim-n" id="limNote">the ask moves; your limit doesn't</div>
         </div>
 
         <div class="callout" id="callout"></div>
@@ -1592,6 +1612,26 @@ function renderVerdict(rd,now){
     $("kKelly").style.color=cap>0?"var(--txt)":"var(--dim2)";
     $("kKellyN").textContent=raw>25?"capped · raw "+raw.toFixed(0)+"%":"½-kelly of bankroll";
   }else{$("kKelly").textContent="—";$("kKellyN").textContent="needs ¢";}
+
+  /* The limit ladder. Chasing a quote that moves faster than you can type it is
+     a losing game; knowing the highest price still worth paying is not. Edge is
+     p − cost, so break-even IS the probability and the ladder is just that
+     number stepped down for margin. */
+  const lb=$("limitBox");
+  if(useDir===0||liveOnHeld==null){
+    lb.style.opacity=".45";
+    ["limGood","limThin","limBE"].forEach(i=>$(i).textContent="—");
+    $("limNote").textContent="no position called — nothing to price";
+  }else{
+    lb.style.opacity="1";
+    const be=liveOnHeld*100, good=be-10, thin=be-4;
+    $("limGood").textContent=good>1?Math.floor(good)+"¢":"—";
+    $("limThin").textContent=thin>1?Math.floor(thin)+"¢":"—";
+    $("limBE").textContent=Math.floor(be)+"¢";
+    const side=useDir===1?"YES":"NO";
+    $("limNote").textContent="Buy "+side+" at or under "+Math.floor(good)+"¢ and the edge survives the "+
+      "quote moving while you type. Over "+Math.floor(be)+"¢ you are paying more than it is worth.";
+  }
 
   renderLiveStrip(live,shown);
 
