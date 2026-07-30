@@ -108,6 +108,24 @@ canvas{width:100%;height:100%;display:block}
 .ws .k{font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase}
 .ws .v{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:5px;font-variant-numeric:tabular-nums}
 
+/* ---------- most likely outcome ---------- */
+.scHead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.scWord{font-size:clamp(26px,3.4vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1}
+.scWord.up{color:var(--yes)} .scWord.dn{color:var(--no)}
+.scRight{text-align:right;flex:none}
+.scP{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.scZ{font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase;margin-top:5px}
+.scNote{font-size:12px;color:var(--dim);line-height:1.5;margin-top:10px}
+.scList{margin-top:16px;display:flex;flex-direction:column;gap:1px;background:var(--line)}
+.scr{background:var(--surf);display:grid;grid-template-columns:132px 1fr 52px;align-items:center;gap:12px;padding:8px 12px}
+.scr .k{font-size:11px}
+.scr.top .k{font-weight:700}
+.scr .bar{height:6px;background:var(--surf2);position:relative;overflow:hidden}
+.scr .bar>i{position:absolute;left:0;top:0;bottom:0;background:var(--dim2)}
+.scr .bar>i.up{background:var(--yes)} .scr .bar>i.dn{background:var(--no)}
+.scr .v{font-family:var(--mono);font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
+.scr .n{grid-column:1/-1;font-size:10px;color:var(--dim2);margin-top:-2px}
+
 /* ---------- wire ---------- */
 .wire .w{display:grid;grid-template-columns:8px 1fr 46px;align-items:center;gap:11px;padding:6px 0;border-bottom:1px solid var(--line)}
 .wire .w:last-child{border-bottom:0}
@@ -264,6 +282,19 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
           <div class="ws"><div class="k">Persistence</div><div class="v" id="wPers">—</div></div>
           <div class="ws"><div class="k">Spread</div><div class="v" id="wSpread">—</div></div>
         </div>
+      </div>
+
+      <div class="sec">
+        <div class="hd"><h2>Most likely outcome</h2><div class="r" id="scMeta">—</div></div>
+        <div class="scHead">
+          <div class="scWord" id="scWord">—</div>
+          <div class="scRight">
+            <div class="scP" id="scP">—</div>
+            <div class="scZ" id="scZ">of 8,000 paths</div>
+          </div>
+        </div>
+        <div class="scNote" id="scNote">simulating…</div>
+        <div class="scList" id="scList"></div>
       </div>
 
       <div class="sec">
@@ -745,7 +776,8 @@ function applyGrade(g,settlePx,strikeUsed){
   if(!record.calls)record.calls=[];
   record.calls.push({t:hhmm(new Date(g.key)),dir:g.dir,p:pct(g.p,1),
                      k:short(strikeUsed).replace("$",""),s:short(settlePx).replace("$",""),
-                     hit,auto:!!g.autoStrike});
+                     hit,auto:!!g.autoStrike,
+                     at:g.at||g.key,px:g.px||null});   // numeric, for chart markers
   if(record.calls.length>40)record.calls=record.calls.slice(-24);
   samples.push({zmc:g.zmc,x:g.x,y:yes?1:0,p:g.pYes,t:Date.now()});
   if(samples.length>400)samples=samples.slice(-300);
@@ -768,7 +800,8 @@ function undoLastGrade(g){
 function settleWindow(key,settlePx){
   if(!lock||lock.key!==key){lock=null;saveLock();return;}
   const g={key,dir:lock.dir,p:lock.p,pYes:lock.pYes,zmc:lock.zmc,x:lock.x,
-           tier:lock.tier,strike:lock.strike,autoStrike:!!lock.autoStrike};
+           tier:lock.tier,strike:lock.strike,autoStrike:!!lock.autoStrike,
+           at:lock.at||key,px:lock.price};
   const {yes,hit}=applyGrade(g,settlePx,lock.strike);
   g.yes=yes; g.hit=hit; g.settlePx=settlePx;
   lastSettled=g; saveLast();
@@ -913,9 +946,15 @@ function runMC(px,k,remainMs,driftPerMin){
   const lk=Math.log(k), lpx=Math.log(px);
   const ends=new Float64Array(MC_PATHS);
   let up=0,touch=0;
+  /* Every path is also filed into one of four archetypes by how it GOT there,
+     not just where it landed. "Ends above having never traded below" and "ends
+     above only after losing the level and clawing back" are the same
+     probability and completely different trades. */
+  let holds=0,reclaims=0,loses=0,stays=0;
   const startAbove=px>=k;
   for(let p=0;p<MC_PATHS;p++){
     let lp=lpx, crossed=false, src=null, idx=0;
+    let everAbove=(lpx>=lk), everBelow=(lpx<lk);
     for(let s=0;s<steps;s++){
       if(s%BLOCK===0){
         const useRecent=Math.random()<pool.recW;
@@ -924,18 +963,46 @@ function runMC(px,k,remainMs,driftPerMin){
       const r=src[idx%src.length]; idx++;
       const sc=(s===steps-1)?lastFrac:1;
       lp+=r*Math.sqrt(sc)+driftPerMin*sc;
+      if(lp>=lk)everAbove=true; else everBelow=true;
       if(!crossed && ((startAbove && lp<lk) || (!startAbove && lp>=lk))) crossed=true;
     }
     const e=Math.exp(lp);
     ends[p]=e;
-    if(e>=k)up++;
+    if(e>=k){ up++; if(everBelow)reclaims++; else holds++; }
+    else     {        if(everAbove)loses++;    else stays++; }
     if(crossed)touch++;
   }
   const sorted=Array.prototype.slice.call(ends).sort((a,b)=>a-b);
   const q=f=>sorted[clamp(Math.floor(f*MC_PATHS),0,MC_PATHS-1)];
+
+  /* Modal landing zone: the densest region of the terminal distribution, found
+     with a sliding 3-bin window over the middle 90%. The median says where the
+     midpoint is; this says where price is most likely to actually be, which is
+     a different question whenever the distribution is skewed. */
+  const lo=q(0.05), hi=q(0.95), NB=30, bw=(hi-lo)/NB;
+  let mode={lo,hi,p:0,mid:(lo+hi)/2};
+  if(bw>0){
+    const cnt=new Array(NB).fill(0);
+    for(let i=0;i<MC_PATHS;i++){
+      const b=Math.floor((ends[i]-lo)/bw);
+      if(b>=0&&b<NB)cnt[b]++;
+    }
+    let bi=0,bs=-1;
+    for(let i=0;i<NB-2;i++){const s3=cnt[i]+cnt[i+1]+cnt[i+2]; if(s3>bs){bs=s3;bi=i;}}
+    mode={lo:lo+bi*bw, hi:lo+(bi+3)*bw, p:bs/MC_PATHS, mid:lo+(bi+1.5)*bw};
+  }
+
+  const scen=[
+    {key:"holds",   p:holds/MC_PATHS,   side:1,  label:"Holds above",  note:"never trades below the strike"},
+    {key:"reclaims",p:reclaims/MC_PATHS,side:1,  label:"Dips, reclaims",note:"loses the level then closes back above"},
+    {key:"loses",   p:loses/MC_PATHS,   side:-1, label:"Loses the level",note:"trades above but closes below"},
+    {key:"stays",   p:stays/MC_PATHS,   side:-1, label:"Stays below",  note:"never reclaims the strike"}
+  ].sort((a,b)=>b.p-a.p);
+
   mcMs=performance.now()-t0;
   return {p:clamp(up/MC_PATHS,0.004,0.996),touch:touch/MC_PATHS,
-          q10:q(0.10),q25:q(0.25),q50:q(0.50),q75:q(0.75),q90:q(0.90),
+          q05:lo,q10:q(0.10),q25:q(0.25),q50:q(0.50),q75:q(0.75),q90:q(0.90),q95:hi,
+          mode,scen,
           sigMin:pool.sd*px, minsLeft, poolN:pool.rawN, recN:pool.recN,
           recW:pool.recW, volExp:pool.volExp};
 }
@@ -1474,6 +1541,39 @@ function renderLiveStrip(live,shown){
   }
 }
 
+/* The winning archetype out of the simulation, plus where it most likely lands.
+   This is the answer to "what actually happens", as opposed to the probability
+   that a single threshold is cleared. */
+function renderScenario(rd){
+  if(!rd||!rd.mc||!rd.mc.scen){$("scWord").textContent="—";$("scNote").textContent="simulating…";return;}
+  const m=rd.mc, top=m.scen[0];
+  $("scWord").textContent=top.label.toUpperCase();
+  $("scWord").className="scWord "+(top.side>0?"up":"dn");
+  $("scP").textContent=pct(top.p,1);
+  $("scP").style.color=top.side>0?"var(--yes)":"var(--no)";
+  $("scZ").textContent="of "+MC_PATHS.toLocaleString()+" paths";
+
+  const sideTot=m.scen.filter(s=>s.side===top.side).reduce((a,s)=>a+s.p,0);
+  const margin=top.p-m.scen[1].p;
+  $("scMeta").textContent="lead "+(margin*100).toFixed(1)+" pts · "+
+    pct(sideTot,0)+" of paths end "+(top.side>0?"above":"below");
+
+  $("scNote").textContent =
+    "Most likely landing zone "+short(m.mode.lo)+"–"+short(m.mode.hi)+
+    " ("+pct(m.mode.p,0)+" of paths). Median close "+short(m.q50)+
+    ", middle 80% spans "+short(m.q10)+"–"+short(m.q90)+". "+
+    (margin<0.06?"The top two scenarios are close — treat this as genuinely unsettled."
+               :"Clear front-runner in the simulation.");
+
+  $("scList").innerHTML=m.scen.map((s,i)=>
+    '<div class="scr'+(i===0?" top":"")+'">'+
+      '<div class="k">'+s.label+'</div>'+
+      '<div class="bar"><i class="'+(s.side>0?"up":"dn")+'" style="width:'+(s.p*100).toFixed(1)+'%"></i></div>'+
+      '<div class="v">'+pct(s.p,1)+'</div>'+
+      (i===0?'<div class="n">'+s.note+'</div>':'')+
+    '</div>').join("");
+}
+
 function renderEvidence(rd){
   if(!rd){$("evList").innerHTML="";return;}
   const byKey={}; rd.fx.meta.forEach(m=>byKey[m.key]=m);
@@ -1683,6 +1783,19 @@ function renderChart(rd){
     };
     band(rd.mc.q90,rd.mc.q10,"rgba(120,140,200,.10)");
     band(rd.mc.q75,rd.mc.q25,"rgba(120,140,200,.13)");
+    // the densest landing zone out of the simulation, drawn where it lands
+    if(rd.mc.mode){
+      const yA=py(rd.mc.mode.hi), yB=py(rd.mc.mode.lo), xA=px(now), xB=px(wE);
+      const g=x.createLinearGradient(xA,0,xB,0);
+      g.addColorStop(0,"rgba(90,169,255,0)"); g.addColorStop(1,"rgba(90,169,255,.20)");
+      x.fillStyle=g; x.fillRect(xA,yA,xB-xA,yB-yA);
+      x.strokeStyle="rgba(90,169,255,.55)"; x.lineWidth=1; x.setLineDash([2,3]);
+      x.beginPath(); x.moveTo(xA,yA); x.lineTo(xB,yA); x.moveTo(xA,yB); x.lineTo(xB,yB); x.stroke();
+      x.setLineDash([]);
+      x.fillStyle="rgba(90,169,255,.95)"; x.font="700 8px -apple-system,Helvetica,sans-serif";
+      x.textAlign="right"; x.fillText("MOST LIKELY "+Math.round(rd.mc.mode.p*100)+"%",xB-4,yA-4);
+      x.textAlign="left";
+    }
     x.setLineDash([3,4]); x.strokeStyle="rgba(180,190,220,.42)"; x.lineWidth=1;
     x.beginPath();
     for(let i=0;i<=30;i++){const f=i/30,t=now+T*f;x.lineTo(px(t),py(price+(rd.mc.q50-price)*Math.sqrt(f)));}
@@ -1728,6 +1841,51 @@ function renderChart(rd){
     x.fillText("SPOT",W-PR+8,lP-4);
     x.fillStyle="#ecedf0"; x.font="600 11px ui-monospace,Menlo,monospace";
     x.fillText(short(price).replace("$",""),W-PR+8,lP+9);
+  }
+
+  /* ---- entry markers: every call the model actually took, on the tape ----
+     Filled = settled and graded (green won / red lost). Outlined = the live
+     lock, still open. Triangle points the direction of the bet. */
+  const mark=(t,pxv,dir,state)=>{
+    if(pxv==null||t==null)return;
+    const X=px(t), Y=py(pxv);
+    if(X<PL-6||X>W-PR+6)return;
+    const up=dir>0, s=7, ty=up?Y+11:Y-11;
+    const col = state==="win"?"#12d18e" : state==="loss"?"#ff4d5e"
+              : (up?"#12d18e":"#ff4d5e");
+    x.beginPath();
+    if(up){ x.moveTo(X,ty-s); x.lineTo(X-s*0.8,ty+s*0.6); x.lineTo(X+s*0.8,ty+s*0.6); }
+    else  { x.moveTo(X,ty+s); x.lineTo(X-s*0.8,ty-s*0.6); x.lineTo(X+s*0.8,ty-s*0.6); }
+    x.closePath();
+    if(state==="open"){
+      x.fillStyle="rgba(8,8,10,.85)"; x.fill();
+      x.strokeStyle=col; x.lineWidth=1.6; x.stroke();
+    }else{ x.fillStyle=col; x.fill(); }
+    // stem to the price it was taken at
+    x.strokeStyle=col; x.lineWidth=1; x.globalAlpha=.5;
+    x.beginPath(); x.moveTo(X,Y); x.lineTo(X,up?ty+s*0.6:ty-s*0.6); x.stroke();
+    x.globalAlpha=1;
+    x.beginPath(); x.arc(X,Y,1.8,0,7); x.fillStyle=col; x.fill();
+    return {X,Y,up,col};
+  };
+  // settled calls still inside the visible span
+  (record.calls||[]).forEach(c=>{
+    if(c.dir===0||c.px==null||c.at==null)return;
+    if(c.at<t0)return;
+    mark(c.at,c.px,c.dir,c.hit?"win":"loss");
+  });
+  // the live lock, labelled
+  if(lock&&lock.dir!==0&&lock.price!=null&&windowStart&&lock.key===windowStart.getTime()){
+    const m=mark(lock.at,lock.price,lock.dir,"open");
+    if(m){
+      const word=lock.dir>0?"BUY YES":"BUY NO";
+      x.font="800 9px -apple-system,Helvetica,sans-serif";
+      const tw=x.measureText(word).width+10;
+      const bx=Math.min(m.X+11,W-PR-tw), by=m.up?m.Y+15:m.Y-25;
+      x.fillStyle="rgba(8,8,10,.9)"; x.fillRect(bx,by,tw,14);
+      x.strokeStyle=m.col; x.lineWidth=1; x.strokeRect(bx+.5,by+.5,tw-1,13);
+      x.fillStyle=m.col; x.textAlign="left"; x.fillText(word,bx+5,by+10);
+    }
   }
 
   // axis ticks
@@ -1847,7 +2005,7 @@ function tickModel(){
     if(!ready){ready=true;log("engine live · "+rd.mc.poolN+" one-minute returns pooled · σ "+money(rd.mc.sigMin)+"/min","hi");}
     updateLock(rd,now);
     renderVerdict(rd,now); renderEvidence(rd); renderLockBox(rd);
-    renderChart(rd); renderWStats(rd); renderNext(rd); renderStale();
+    renderChart(rd); renderWStats(rd); renderNext(rd); renderStale(); renderScenario(rd);
     if(rd.dir!==lastDir&&lastDir!==null&&!lock){
       log("live read moved to "+(rd.dir===1?"YES":rd.dir===-1?"NO":"SKIP")+" @ "+pct(rd.pYes,1),
           rd.dir===1?"g":rd.dir===-1?"r":"y");
