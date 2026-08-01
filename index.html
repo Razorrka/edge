@@ -541,7 +541,14 @@ const FEATS = BLOCKS.reduce((a,b)=>a.concat(b.feats),[]);
 /* Training samples store block values, not raw features. Bump this whenever
    that shape changes so stale samples are dropped instead of silently
    contributing zeros to every block they predate. */
-const SCHEMA = 3;
+const SCHEMA = 4;
+/* Everything at or below this version had its training data contaminated by
+   the late-flip bug: an auto-flip overwrote the frozen snapshot, so samples
+   could be reads taken once distance had already settled the window. Those
+   cannot be repaired — the honest 0:40 read was never stored — and the record
+   built alongside them was scoring a different thing. Crossing this line wipes
+   both, on every device, without anyone having to remember to press a button. */
+const SCHEMA_POISONED = 3;
 
 const $ = id => document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -588,13 +595,24 @@ function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function load(k,d){try{const j=JSON.parse(localStorage.getItem(k));return j==null?d:j;}catch(e){return d;}}
 function loadAll(){
   /* Samples carry block values whose shape is versioned. A stale set would
-     feed zeros into every block added since it was written, so it is dropped —
-     but the W/L record and the settled-call log survive, because those are
-     your history, not the model's inputs. */
+     feed zeros into every block added since it was written, so it is dropped.
+     Normally the W/L record and settled-call log survive a bump — those are
+     your history, not the model's inputs — but a version at or below
+     SCHEMA_POISONED was also SCORING the wrong thing, so that history goes
+     too rather than being carried forward under a false label. */
   const ver=load(LS.schema,1);
   if(ver!==SCHEMA){
+    const full = ver<=SCHEMA_POISONED;
     save(LS.samples,[]); save(LS.model,null); save(LS.schema,SCHEMA);
-    pendingSchemaNote=ver;
+    if(full){
+      save(LS.rec,null); save(LS.lock,null); save(LS.last,null);
+      record={w:0,l:0,skips:0,streak:0,best:0,worst:0,hist:[],calls:[],
+              byState:{},byDiff:{},bsum:0,bn:0};
+      // in-memory too: clearing storage alone leaves a live model in place
+      model={a:1,b:0,s:1,w:{},n:0}; BKEYS.forEach(k=>model.w[k]=0);
+      samples=[]; lock=null; lastSettled=null;
+    }
+    pendingSchemaNote={from:ver,full};
   }
   const m=load(LS.model,null);
   if(m&&m.w){model.a=m.a;model.b=m.b;model.s=m.s;model.n=m.n||0;BKEYS.forEach(k=>model.w[k]=m.w[k]||0);}
@@ -2544,8 +2562,13 @@ function wireInputs(){
   loadAll(); wireInputs(); renderRecord(); renderStream(); renderWire(); renderWStats(null);
   renderHist(); renderDiff(); renderLast(); renderStale();
   log("boot · "+(samples.length?samples.length+" stored windows in the training set":"cold start, no history yet"),"hi");
-  if(pendingSchemaNote!=null)
-    log("signal set changed (v"+pendingSchemaNote+"→v"+SCHEMA+") · training set reset, W/L record kept","y");
+  if(pendingSchemaNote!=null){
+    if(pendingSchemaNote.full)
+      log("FULL RESET (v"+pendingSchemaNote.from+"→v"+SCHEMA+") · training set, model and W/L all wiped — "+
+          "pre-v"+SCHEMA+" samples were captured by late flips after distance had decided the window","hi");
+    else
+      log("signal set changed (v"+pendingSchemaNote.from+"→v"+SCHEMA+") · training set reset, W/L record kept","y");
+  }
   log(FEATS.length+" signals across "+BLOCKS.length+" blocks · "+
       BLOCKS.map(b=>b.label.split(" ")[0].toLowerCase()).join(" · "),"b");
   startWS();
