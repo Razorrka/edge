@@ -469,6 +469,11 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
       </div>
 
       <div class="sec">
+        <div class="hd"><h2>Where the wins come from</h2><div class="r" id="diffMeta">—</div></div>
+        <div class="ev" id="diffList"></div>
+      </div>
+
+      <div class="sec">
         <div class="hd"><h2>Settled calls</h2><div class="r" id="histMeta">—</div></div>
         <div class="ev" id="histList"></div>
       </div>
@@ -564,7 +569,7 @@ let lastSettled=null;      // most recent graded window, re-gradeable if the str
 let risk=0.75, autoFlip=true, gameMode=false;
 let mc=null, read=null, lock=null;
 let model={a:1,b:0,s:1,w:{},n:0};
-let samples=[], record={w:0,l:0,skips:0,streak:0,best:0,worst:0,hist:[],calls:[],bsum:0,bn:0};
+let samples=[], record={w:0,l:0,skips:0,streak:0,best:0,worst:0,hist:[],calls:[],byState:{},byDiff:{},bsum:0,bn:0};
 let stream=[], mcMs=0, mcAt=0, ready=false;
 let forceLock=false, forceSide=false, dropLock=false, lastAgainst=null;
 const FLIP_DEADLINE=45000, FLIP_BUDGET=4, MIN_FLIP_GAP=90000;
@@ -847,15 +852,29 @@ function applyGrade(g,settlePx,strikeUsed){
   if(record.hist.length>200)record.hist=record.hist.slice(-120);
   if(g.dir===0)record.skips++; else if(hit)record.w++; else record.l++;
   recomputeStreak();
-  // Brier scores the raw close-above probability, so sit-outs are graded too
-  record.bsum += Math.pow(g.pYes-(yes?1:0),2); record.bn++;
+  /* Brier scores the FROZEN 0:40 forecast, not a late flip. Otherwise the
+     score measures how well arithmetic works near the bell instead of how well
+     the model forecasts a window. */
+  const bp=g.trainP!=null?g.trainP:g.pYes;
+  record.bsum += Math.pow(bp-(yes?1:0),2); record.bn++;
+
+  /* Split the record by how hard the call actually was at the decision point.
+     A model that only wins gimmes and coin-flips everything else looks fine on
+     a single win rate and is worth nothing — this is the number that tells. */
+  const diff = g.pmc==null?"LEAN":
+               (Math.abs(g.pmc-0.5)<0.10?"COINFLIP":Math.abs(g.pmc-0.5)<0.25?"LEAN":"CLEAR");
+  if(!record.byDiff)record.byDiff={};
+  const bd=record.byDiff[diff]||(record.byDiff[diff]={w:0,l:0,s:0,bs:0,bn:0});
+  if(g.dir===0)bd.s++; else if(hit)bd.w++; else bd.l++;
+  bd.bs+=Math.pow(bp-(yes?1:0),2); bd.bn++;
+  g.diff=diff;
   if(!record.calls)record.calls=[];
   record.calls.push({t:hhmm(new Date(g.key)),dir:g.dir,p:pct(g.p,1),
                      k:short(strikeUsed).replace("$",""),s:short(settlePx).replace("$",""),
                      hit,auto:!!g.autoStrike,
                      at:g.at||g.key,px:g.px||null});   // numeric, for chart markers
   if(record.calls.length>40)record.calls=record.calls.slice(-24);
-  samples.push({zmc:g.zmc,x:g.x,y:yes?1:0,p:g.pYes,t:Date.now(),
+  samples.push({zmc:g.zmc,x:g.x,y:yes?1:0,p:bp,t:Date.now(),
                 tau:g.tau,pmc:g.pmc,state:g.state,hard:!!g.hard});
   if(samples.length>400)samples=samples.slice(-300);
   // per-state track record: which market states this model is actually good in
@@ -873,8 +892,13 @@ function undoLastGrade(g){
   else if(h==="w")record.w=Math.max(0,record.w-1);
   else if(h==="l")record.l=Math.max(0,record.l-1);
   recomputeStreak();
-  record.bsum=Math.max(0,record.bsum-Math.pow(g.pYes-(g.yes?1:0),2));
+  const bp=g.trainP!=null?g.trainP:g.pYes;
+  record.bsum=Math.max(0,record.bsum-Math.pow(bp-(g.yes?1:0),2));
   record.bn=Math.max(0,record.bn-1);
+  const bd=record.byDiff&&record.byDiff[g.diff];
+  if(bd){ if(g.dir===0)bd.s=Math.max(0,bd.s-1);
+          else if(g.hit)bd.w=Math.max(0,bd.w-1); else bd.l=Math.max(0,bd.l-1);
+          bd.bs=Math.max(0,bd.bs-Math.pow(bp-(g.yes?1:0),2)); bd.bn=Math.max(0,bd.bn-1); }
   if(record.calls&&record.calls.length)record.calls.pop();
   if(samples.length)samples.pop();
   const bs=record.byState&&record.byState[g.state||"?"];
@@ -885,10 +909,13 @@ function undoLastGrade(g){
 
 function settleWindow(key,settlePx){
   if(!lock||lock.key!==key){lock=null;saveLock();return;}
-  const g={key,dir:lock.dir,p:lock.p,pYes:lock.pYes,zmc:lock.zmc,x:lock.x,
+  const tr=lock.train||{};
+  const g={key,dir:lock.dir,p:lock.p,pYes:lock.pYes,
            tier:lock.tier,strike:lock.strike,autoStrike:!!lock.autoStrike,
-           at:lock.at||key,px:lock.price,
-           tau:lock.tau,pmc:lock.pmc,state:lock.state,hard:!!lock.hard};
+           at:lock.at||key,px:lock.price,flips:lock.flips||0,
+           // learning always uses the frozen 0:40 read, never a late flip
+           zmc:tr.zmc,x:tr.x,tau:tr.tau,pmc:tr.pmc,trainP:tr.pYes,
+           state:tr.state,hard:!!tr.hard};
   const {yes,hit}=applyGrade(g,settlePx,lock.strike);
   g.yes=yes; g.hit=hit; g.settlePx=settlePx;
   lastSettled=g; saveLast();
@@ -908,7 +935,7 @@ function settleWindow(key,settlePx){
     log("that window was graded on the AUTO strike "+short(g.strike)+
         " — re-grade it below if Kalshi's differed","y");
 
-  saveSamples(); saveRec(); renderHist(); renderLast();
+  saveSamples(); saveRec(); renderHist(); renderDiff(); renderLast();
   train();
   lock=null; saveLock();
 }
@@ -927,7 +954,7 @@ function regradeLast(newStrike){
   lastSettled=g; saveLast();
   log("re-graded "+hhmm(new Date(g.key))+" · strike "+short(oldK)+" → "+short(newStrike)+
       " · settled "+short(g.settlePx)+" · "+(g.dir===0?"sat out":(was?"WIN":"LOSS")+" → "+(r.hit?"WIN":"LOSS")),"hi");
-  saveSamples(); saveRec(); renderHist(); renderRecord(); renderLast();
+  saveSamples(); saveRec(); renderHist(); renderDiff(); renderRecord(); renderLast();
   train();
   return true;
 }
@@ -1481,9 +1508,18 @@ function updateLock(rd,now){
   if(!rd||!windowStart)return;
   const key=windowStart.getTime(), elapsed=now-key, remain=rd.remain;
   const snap=()=>({key,dir:rd.dir,p:rd.p,pYes:rd.pYes,price,strike,at:now,tier:rd.tier,
-                   zmc:rd.zmc,x:rd.fx.B,edge:rd.edge,cost:rd.cost,autoStrike:strikeAuto,
-                   tau:rd.fx.tau,pmc:rd.mc?rd.mc.p:null,
-                   state:rd.fx.state?rd.fx.state.k:null,hard:!!(rd.fx.state&&rd.fx.state.hard),
+                   edge:rd.edge,cost:rd.cost,autoStrike:strikeAuto,
+                   /* What the model LEARNS from is frozen at the first lock and
+                      never overwritten by a flip. A flip taken with a minute to
+                      go captures a read that distance has already decided —
+                      training on that teaches the model nothing except that
+                      arithmetic works. The position may keep changing; the
+                      forecasting problem stays "call this window from 0:40". */
+                   train:(lock&&lock.key===key&&lock.train)?lock.train:{
+                     zmc:rd.zmc,x:rd.fx.B,tau:rd.fx.tau,pmc:rd.mc?rd.mc.p:null,
+                     pYes:rd.pYes,at:now,
+                     state:rd.fx.state?rd.fx.state.k:null,
+                     hard:!!(rd.fx.state&&rd.fx.state.hard)},
                    flips:lock&&lock.key===key?(lock.flips||0):0});
 
   if(lock&&lock.key!==key){lock=null;}
@@ -2071,6 +2107,36 @@ function renderLast(){
     '<div class="en2">'+r[2]+'</div></div>').join("");
 }
 
+/* The accountability panel. A single win rate hides the difference between
+   "called a genuine 50/50 correctly" and "noticed price was $200 clear with a
+   minute left". Only the first is skill, and only the first is worth money. */
+function renderDiff(){
+  const el=$("diffList"); if(!el)return;
+  const D=record.byDiff||{};
+  const rows=[["COINFLIP","Coin flips","within 10 pts of 50/50 at 0:40"],
+              ["LEAN","Leans","10–25 pts off"],
+              ["CLEAR","Gimmes","already 25+ pts clear"]];
+  let any=false, cw=0,cl=0;
+  el.innerHTML=rows.map(r=>{
+    const d=D[r[0]]||{w:0,l:0,s:0,bs:0,bn:0}, n=d.w+d.l;
+    if(n)any=true;
+    if(r[0]!=="CLEAR"){cw+=d.w;cl+=d.l;}
+    const wr=n?d.w/n:null;
+    const col=wr==null?"var(--dim2)":wr>=0.55?"var(--yes)":wr<0.45?"var(--no)":"var(--txt)";
+    const br=d.bn?(d.bs/d.bn).toFixed(3):"—";
+    return '<div class="evr" style="grid-template-columns:96px 60px 1fr 108px">'+
+      '<div class="en">'+r[1]+'</div>'+
+      '<div class="ev2" style="text-align:left;color:'+col+'">'+d.w+'–'+d.l+'</div>'+
+      '<div class="ev2" style="text-align:left;color:'+col+'">'+(wr==null?"—":pct(wr,0))+
+        '<span style="color:var(--dim2)"> · brier '+br+'</span></div>'+
+      '<div class="en2">'+r[2]+'</div></div>';
+  }).join("");
+  const hard=cw+cl;
+  $("diffMeta").textContent = !any?"nothing settled yet"
+    : hard? "skill sample: "+cw+"–"+cl+" on the "+hard+" that weren't gimmes"
+          : "only gimmes so far — no skill measured";
+}
+
 function renderHist(){
   const el=$("histList"); if(!el)return;
   const cs=(record.calls||[]).slice(-8).reverse();
@@ -2460,12 +2526,12 @@ function wireInputs(){
   paint();
   $("btnReset").addEventListener("click",()=>{
     if(!confirm("Wipe the track record, the training set and the learned weights?"))return;
-    samples=[];record={w:0,l:0,skips:0,streak:0,best:0,worst:0,hist:[],calls:[],bsum:0,bn:0};
+    samples=[];record={w:0,l:0,skips:0,streak:0,best:0,worst:0,hist:[],calls:[],byState:{},byDiff:{},bsum:0,bn:0};
     model={a:1,b:0,s:1,w:{},n:0};BKEYS.forEach(k=>model.w[k]=0);
     lock=null;lastSettled=null;
     saveModel();saveSamples();saveRec();saveLock();saveLast();
     log("record + model wiped — starting from the prior","y");
-    renderRecord();renderHist();renderLast();
+    renderRecord();renderHist();renderDiff();renderLast();
   });
   if(!strikeAuto&&strike!=null)si.value=String(strike);
   if(yesC!=null)$("inYes").value=String(yesC);
@@ -2476,7 +2542,7 @@ function wireInputs(){
 /* ---------------- boot ---------------- */
 (async function boot(){
   loadAll(); wireInputs(); renderRecord(); renderStream(); renderWire(); renderWStats(null);
-  renderHist(); renderLast(); renderStale();
+  renderHist(); renderDiff(); renderLast(); renderStale();
   log("boot · "+(samples.length?samples.length+" stored windows in the training set":"cold start, no history yet"),"hi");
   if(pendingSchemaNote!=null)
     log("signal set changed (v"+pendingSchemaNote+"→v"+SCHEMA+") · training set reset, W/L record kept","y");
