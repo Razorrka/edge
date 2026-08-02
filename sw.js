@@ -2,7 +2,7 @@
    so the model always talks to Coinbase live. Network-first so a new build
    lands immediately; cache is purely the offline fallback.
    BUMP CACHE ON EVERY PUBLISH or phones keep the old build. */
-const CACHE="edge-v11";
+const CACHE="edge-v12";
 const SHELL=["./","./index.html","./manifest.webmanifest",
              "./icon-180.png","./icon-192.png","./icon-512.png"];
 self.addEventListener("install",e=>{
@@ -16,8 +16,14 @@ self.addEventListener("activate",e=>{
 self.addEventListener("fetch",e=>{
   const u=new URL(e.request.url);
   if(u.origin!==location.origin)return;          // Coinbase / news / sentiment: hands off
+  /* GitHub Pages serves the shell with max-age=600, and a plain fetch() inside
+     a service worker still reads the browser HTTP cache -- so a fresh build
+     could sit invisible for ten minutes after deploying. Navigations and the
+     shell bypass that cache explicitly. */
+  const isShell = e.request.mode==="navigate" ||
+                  u.pathname.endsWith("/") || u.pathname.endsWith("index.html");
   e.respondWith(
-    fetch(e.request).then(r=>{
+    fetch(e.request, isShell?{cache:"reload"}:undefined).then(r=>{
       const copy=r.clone();
       caches.open(CACHE).then(c=>c.put(e.request,copy)).catch(()=>{});
       return r;
