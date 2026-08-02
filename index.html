@@ -359,7 +359,7 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
     <div class="hero">
       <canvas id="chart"></canvas>
       <div class="callcard">
-        <div class="ct" id="vtag">Live read</div>
+        <div class="ct"><span id="vtag">Live read</span> <span id="vage" style="color:var(--dim2);font-weight:400;letter-spacing:.06em"></span></div>
         <div class="cw skip" id="vword">WARMING</div>
         <div class="cp" id="pprob">—</div>
         <div class="cl" id="pprobl">probability</div>
@@ -388,6 +388,7 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
       <div class="grid2">
         <div>
           <div class="blk">
+            <div id="vsub" style="font-size:12.5px;color:var(--dim);line-height:1.55;margin-bottom:16px"></div>
             <div class="desk">
               <div class="desk-h"><span class="desk-l">The read</span><span class="desk-s" id="deskState">—</span></div>
               <div class="desk-b" id="deskTxt">watching.</div>
@@ -413,7 +414,7 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
           </div>
         </div>
         <div>
-          <div class="blk"><div class="limit">
+          <div class="blk"><div class="limit" id="limitBox">
             <div class="lim-h">Pay up to</div>
             <div class="lim-row">
               <div class="lim-c"><div class="lim-v" id="limGood2">—</div><div class="lim-k">good buy</div></div>
@@ -2665,7 +2666,8 @@ function renderChart(rd){
       let exp=lock.projPx;
       for(let i2=0;i2<lock.proj.length;i2++){ if(lock.proj[i2].min<=el)exp=lock.proj[i2].p50; }
       const err=price-exp;
-      const band=rd&&rd.mc?rd.mc.sigMin*Math.sqrt(Math.max(el,0.2)):null;
+      // at least a minute of sigma: you cannot be "4 sigma off" twelve seconds in
+      const band=rd&&rd.mc?rd.mc.sigMin*Math.sqrt(Math.max(el,1)):null;
       const on=band?Math.abs(err)<=band:true;
       tp.textContent="tracking "+(err>=0?"+":"−")+money(Math.abs(err))+" vs forecast"+
                      (band?" · "+(Math.abs(err)/band).toFixed(2)+"σ":"");
@@ -2959,6 +2961,17 @@ function tickModel(){
   lastMC=now;
   const rd=computeRead(now);
   read=rd;
+  try{ paintAll(rd,now); }
+  catch(e){
+    /* One render touching a stale element id used to abort the whole tick,
+       which froze every panel while the engine underneath was fine. Isolate
+       it: the loop keeps running and the failure gets named. */
+    if(!tickErr||tickErr!==e.message){ tickErr=e.message; log("render error: "+e.message,"r"); }
+  }
+  renderRecord();
+}
+let tickErr=null;
+function paintAll(rd,now){
   if(rd){
     if(!ready){ready=true;log("engine live · "+rd.mc.poolN+" one-minute returns pooled · σ "+money(rd.mc.sigMin)+"/min","hi");}
     updateLock(rd,now);
@@ -2974,7 +2987,6 @@ function tickModel(){
   }else{
     renderVerdict(null,now); renderChart(null); renderWStats(null);
   }
-  renderRecord();
 }
 
 /* ---------------- inputs ---------------- */
