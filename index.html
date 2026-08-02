@@ -252,6 +252,30 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 .ledger .lg:last-child{border-bottom:0}
 .ledger .lg .m{font-family:var(--mono);font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
 
+
+/* paper: kalshi-style dollar entry */
+.amt{margin-top:16px}
+.amt label{display:block;font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase;margin-bottom:7px}
+.amtrow{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line2);padding-bottom:6px}
+.amtrow .cur{font-family:var(--mono);font-size:30px;color:var(--dim2);line-height:1}
+.amtrow input{flex:1;background:transparent;border:0;outline:none;color:var(--txt);
+  font-family:var(--mono);font-size:34px;font-weight:700;padding:0;width:100%}
+.chips{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.chips button{background:var(--surf2);color:var(--dim);border:1px solid var(--line2);
+  font-family:var(--mono);font-size:11.5px;padding:7px 12px}
+.chips button:hover{color:var(--txt);border-color:var(--dim2)}
+.side .stop{display:flex;align-items:baseline;justify-content:space-between}
+.side .sn{font-size:11px;letter-spacing:.16em;font-weight:800}
+.side .sc{font-family:var(--mono);font-size:22px;font-weight:700}
+.side .sq{font-family:var(--mono);font-size:15px;font-weight:600;margin-top:9px}
+.side .sm{font-size:10.5px;color:var(--dim2);margin-top:3px}
+.ovr{margin-top:14px}
+.ovr label{display:block;font-size:9px;letter-spacing:.14em;color:var(--dim2);text-transform:uppercase;margin-bottom:5px}
+.ovr label span{letter-spacing:0;text-transform:none;opacity:.7}
+.ovr input{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line2);
+  color:var(--txt);font-family:var(--mono);font-size:14px;padding:2px 0 5px;outline:none}
+@media(pointer:coarse){.amtrow input{font-size:34px}.ovr input{font-size:16px}}
+
 /* flash */
 #flash{position:fixed;left:50%;top:18px;transform:translateX(-50%) translateY(-140%);z-index:999;
   background:var(--surf);border:1px solid var(--line2);padding:13px 20px;max-width:min(92vw,470px);
@@ -583,25 +607,34 @@ body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-i
             <div class="mkt">
               <div class="q" id="pQ">BTC price up in next 15 mins?</div>
               <div class="sub" id="pSub">—</div>
+              <div class="amt">
+                <label>Amount</label>
+                <div class="amtrow"><span class="cur">$</span><input id="pUsd" type="text" inputmode="decimal" value="25" /></div>
+                <div class="chips">
+                  <button data-add="5">+$5</button>
+                  <button data-add="10">+$10</button>
+                  <button data-add="25">+$25</button>
+                  <button data-add="100">+$100</button>
+                  <button data-add="0">Clear</button>
+                </div>
+              </div>
               <div class="sides">
                 <div class="side y">
-                  <div class="sn">YES</div>
-                  <div class="sc" id="pYesC">—</div>
-                  <div class="sm" id="pYesM">model —</div>
+                  <div class="stop"><span class="sn">YES</span><span class="sc" id="pYesC">—</span></div>
+                  <div class="sq" id="pYesQ">—</div>
+                  <div class="sm" id="pYesM">—</div>
                   <button id="pBuyYes">Buy Yes</button>
                 </div>
                 <div class="side n">
-                  <div class="sn">NO</div>
-                  <div class="sc" id="pNoC">—</div>
-                  <div class="sm" id="pNoM">model —</div>
+                  <div class="stop"><span class="sn">NO</span><span class="sc" id="pNoC">—</span></div>
+                  <div class="sq" id="pNoQ">—</div>
+                  <div class="sm" id="pNoM">—</div>
                   <button id="pBuyNo">Buy No</button>
                 </div>
               </div>
-              <div class="ctl" style="margin-top:14px">
-                <div class="f"><label>Contracts</label>
-                  <input id="pQty" type="text" inputmode="numeric" placeholder="10" /></div>
-                <div class="f"><label>Price override ¢</label>
-                  <input id="pPx" type="text" inputmode="decimal" placeholder="model price" /></div>
+              <div class="ovr">
+                <label>Price override ¢ <span>optional — blank uses the model</span></label>
+                <input id="pPx" type="text" inputmode="decimal" placeholder="model price" />
               </div>
             </div>
             <div id="pPos"></div>
@@ -2686,7 +2719,7 @@ function renderChart(rd){
    live engine grades on, so the ledger answers "what would have happened"
    with the real outcome rather than a guess.
    ============================================================ */
-let paper=load(LS.paper,{pos:null,ledger:[],pnl:0,w:0,l:0,edgeSum:0,edgeN:0});
+let paper=load(LS.paper,{pos:null,ledger:[],pnl:0,w:0,l:0,edgeSum:0,edgeN:0,usd:25});
 const savePaper=()=>save(LS.paper,paper);
 
 function paperPrice(side,rd){
@@ -2698,19 +2731,31 @@ function paperPrice(side,rd){
   // no quote entered: mark at the model, so the ledger measures the CALL not a fill
   return side===1?rd.pYes:1-rd.pYes;
 }
+/* Contracts are whole $1-payout units, so a dollar amount buys floor(usd/price)
+   of them and the remainder is simply not spent — same as the exchange. */
+function paperQty(side,rd){
+  const usd=Math.max(0,num($("pUsd").value)||0);
+  const cost=paperPrice(side,rd);
+  if(cost==null||cost<=0||cost>=1)return {qty:0,cost:null,spend:0,payout:0,profit:0,usd};
+  const qty=Math.min(5000,Math.floor(usd/cost));
+  const spend=qty*cost;
+  return {qty,cost,spend,payout:qty,profit:qty-spend,usd};
+}
 function paperOpen(side,rd){
   if(!rd||strike==null||!windowStart)return;
   if(paper.pos){log("paper: already holding this window — settle first","y");return;}
-  const qty=Math.max(1,Math.min(1000,Math.round(num($("pQty").value)||10)));
-  const cost=paperPrice(side,rd); if(cost==null||cost<=0||cost>=1)return;
+  const q=paperQty(side,rd);
+  if(q.qty<1){log("paper: amount too small for one contract at "+
+    (q.cost!=null?Math.round(q.cost*100)+"¢":"that price"),"y");return;}
+  const qty=q.qty, cost=q.cost;
   const mp=side===1?rd.pYes:1-rd.pYes;
   paper.pos={key:windowStart.getTime(),side,qty,cost,strike,
              at:Date.now(),spot:price,modelP:mp,edge:mp-cost};
   savePaper(); renderPaper(rd);
-  log("paper: bought "+qty+"x "+(side===1?"YES":"NO")+" @ "+(cost*100).toFixed(0)+
+  log("paper: "+money(qty*cost)+" on "+qty+"x "+(side===1?"YES":"NO")+" @ "+(cost*100).toFixed(0)+
       "¢ · model "+pct(mp,0)+" · edge "+((mp-cost)*100>=0?"+":"")+((mp-cost)*100).toFixed(1)+"pts","hi");
   flash(side===1?"PAPER: BOUGHT YES 🚀":"PAPER: BOUGHT NO 📉",
-        qty+" @ "+(cost*100).toFixed(0)+"¢ · risking "+money(qty*cost),
+        money(qty*cost)+" · "+qty+" @ "+(cost*100).toFixed(0)+"¢ · win "+money(qty),
         side===1?"buy":"sell","paper",8000);
 }
 function paperSettle(key,settlePx){
@@ -2743,10 +2788,17 @@ function renderPaper(rd){
   const yc=paperPrice(1,rd), nc=paperPrice(-1,rd);
   $("pYesC").textContent = yc==null?"—":Math.round(yc*100)+"¢";
   $("pNoC").textContent  = nc==null?"—":Math.round(nc*100)+"¢";
-  $("pYesM").textContent = py==null?"model —":"model "+pct(py,0);
-  $("pNoM").textContent  = py==null?"model —":"model "+pct(1-py,0);
+  const qy=paperQty(1,rd), qn=paperQty(-1,rd);
+  $("pYesQ").textContent = qy.qty?qy.qty+" contracts":"—";
+  $("pNoQ").textContent  = qn.qty?qn.qty+" contracts":"—";
+  $("pYesM").textContent = qy.qty
+    ? "risk "+money(qy.spend)+" · win "+money(qy.payout)+" (+"+money(qy.profit)+")"
+    : (py==null?"model —":"model "+pct(py,0));
+  $("pNoM").textContent  = qn.qty
+    ? "risk "+money(qn.spend)+" · win "+money(qn.payout)+" (+"+money(qn.profit)+")"
+    : (py==null?"model —":"model "+pct(1-py,0));
   const dis=!rd||strike==null||!!paper.pos;
-  $("pBuyYes").disabled=dis; $("pBuyNo").disabled=dis;
+  $("pBuyYes").disabled=dis||qy.qty<1; $("pBuyNo").disabled=dis||qn.qty<1;
 
   const el=$("pPos");
   if(paper.pos){
@@ -2849,11 +2901,25 @@ function wireTabs(){
   };
   $("tabLive").addEventListener("click",()=>showView(false));
   $("tabPaper").addEventListener("click",()=>showView(true));
+  const amt=$("pUsd");
+  if(paper.usd!=null)amt.value=String(paper.usd);
+  amt.addEventListener("input",()=>{
+    paper.usd=num(amt.value); savePaper(); renderPaper(read);
+  });
+  document.querySelectorAll(".chips button").forEach(b=>{
+    b.addEventListener("click",()=>{
+      const add=+b.dataset.add;
+      const cur=num(amt.value)||0;
+      amt.value=add===0?"":String(Math.round((cur+add)*100)/100);
+      paper.usd=num(amt.value); savePaper(); renderPaper(read);
+    });
+  });
+  $("pPx").addEventListener("input",()=>renderPaper(read));
   $("pBuyYes").addEventListener("click",()=>paperOpen(1,read));
   $("pBuyNo").addEventListener("click",()=>paperOpen(-1,read));
   $("pReset").addEventListener("click",()=>{
     if(!confirm("Clear the paper ledger and P&L?"))return;
-    paper={pos:null,ledger:[],pnl:0,w:0,l:0,edgeSum:0,edgeN:0};
+    paper={pos:null,ledger:[],pnl:0,w:0,l:0,edgeSum:0,edgeN:0,usd:paper.usd};
     savePaper(); renderPaper(read); log("paper ledger cleared","y");
   });
 }
